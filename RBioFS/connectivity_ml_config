@@ -1,0 +1,172 @@
+# File name: connectivity_ml_config
+# Description: Configeration file for connectivity_ml.sh, containing variable and values for the application
+# Usage: Adjust the values for the variables
+#
+# ------ Settings for data preprocessing ------
+log2_trans=TRUE
+
+# ------ Settings for all-connection clustering analysis ------
+# -- Hierarchical clustering --
+htmap_textsize_col=0.3
+htmap_textangle_col=90
+htmap_lab_row=FALSE
+htmap_textsize_row=0.7
+htmap_keysize=1.5
+htmap_key_xlab="Normalized connectivity"
+htmap_key_ylab="Pair count"
+htmap_margin="c(6, 3)"
+htmap_width=15
+htmap_height=10
+
+# -- PCA --
+pca_scale_data=TRUE
+pca_centre_data=TRUE
+pca_pc="c(1, 2, 3)"
+pca_biplot_samplelabel_type="none"  # options are "none", "direct" and "indirect"
+pca_biplot_samplelabel_size=2
+pca_biplot_symbol_size=5
+pca_biplot_ellipse=FALSE
+pca_biplot_ellipse_conf=0.9
+pca_biplot_loading=TRUE  # this setting only applies to the sig PCA and ML PCA below
+pca_biplot_loading_textsize=3
+pca_biplot_multi_desity=TRUE
+pca_biplot_multi_striplabel_size=10
+pca_rightside_y=FALSE
+pca_x_tick_label_size=10
+pca_y_tick_label_size=10
+pca_width=170
+pca_height=150
+
+# ------ Settings for univariate analysis ------
+# -- Univeriate analysis --
+uni_fdr=FALSE
+uni_alpha=0.05
+uni_fold_change=1
+volcano_n_top_connection=10
+volcano_symbol_size=2
+volcano_sig_colour="red"
+volcano_nonsig_colour="gray"
+volcano_x_text_size=10
+volcano_y_text_size=10
+volcano_width=170
+volcano_height=150
+
+# -- hierachical clustering: sig connections --
+# NOTE: fdr, p value and fc settings same as Univeriate settings for heatmap
+# NOTE: sig pca uses mostly the same settings as all connections pca
+sig_htmap_textsize_col=0.3
+sig_htmap_textangle_col=90
+sig_htmap_textsize_row=0.2
+sig_htmap_keysize=1.5
+sig_htmap_key_xlab="Z score"
+sig_htmap_key_ylab="Count"
+sig_htmap_margin="c(6, 9)"
+sig_htmap_width=15
+sig_htmap_height=10
+sig_pca_pc="c(1, 2, 3)"
+sig_pca_biplot_ellipse_conf=0.9
+
+# ------ Settings for SVM machine learning analysis ------
+# -- General settings --
+cpu_cluster="PSOCK"  # for parallel computing only, options are "FORK" or "PSOCK"
+
+# -- Data processing --
+training_percentage=0.85  # range (non-inclusive): (0, 1). Will set to 0.8 if set 1 or 0
+
+# -- SVM internal nested cross-validation and feature selection
+svm_cv_centre_scale=TRUE
+svm_cv_kernel="radial"  # options are "linear", "ploynomial", "radial", "sigmoid". "radial" aka RBF
+svm_cv_cross_k=10  # outer loop
+svm_cv_tune_method="cross"  # inner loop. options are "cross" (i.e. cross validation), "boot" (i.e. bootstrap), and "fix"
+svm_cv_tune_cross_k=10  # set only when svm_cv_tune_method="cross", fold number for cross validation
+svm_cv_tune_boot_n=10  # set only when svm_cv_tune_method="boot", bootstrap iterations
+svm_cv_fs_rf_ifs_ntree=501
+svm_cv_fs_rf_sfs_ntree=501
+svm_cv_best_model_method="none"  # opitons are "none" or "median"
+svm_cv_fs_count_cutoff=2
+
+# -- SVM modelling --
+# NOTE: some settings will share with the above CV step
+# i.e. svm_cv_centre_scale, svm_cv_kernel
+svm_cross_k=10
+svm_tune_cross_k=10   # set only when svm_cv_tune_method="cross", fold number for cross validation
+svm_tune_boot_n=10  # set only when svm_cv_tune_method="boot", bootstrap iterations
+
+# -- SVM permuation test --
+svm_perm_method="by_y"  # options are "by_y" and "by_feature_per_y"
+svm_perm_n=99
+svm_perm_plot_symbol_size=2
+svm_perm_plot_legend_size=9
+svm_perm_plot_x_label_size=10
+svm_perm_plot_x_tick_label_size=10
+svm_perm_plot_y_label_size=10
+svm_perm_plot_y_tick_label_size=10
+svm_perm_plot_width=250
+svm_perm_plot_height=150
+
+# -- SVM ROC AUC --
+svm_roc_smooth=FALSE
+svm_roc_symbol_size=2
+svm_roc_legend_size=9
+svm_roc_x_label_size=10
+svm_roc_x_tick_label_size=10
+svm_roc_y_label_size=10
+svm_roc_y_tick_label_size=10
+svm_roc_width=170
+svm_roc_height=150
+
+# -- SVM RFFS PCA --
+svm_rffs_pca_pc="c(1, 2, 3)"
+svm_rffs_pca_biplot_ellipse_conf=0.95
+
+# ------ Settings for PLS-DA modelling for evaluating SVM results ------
+# -- global PLS-DA settings
+plsda_validation="CV"  # options are "none", "CV" and "LOO"
+plsda_validation_segment=10  # not needed when plsda_init_validation="LOO"
+
+# -- Initial PLS-DA modelling settings --
+plsda_init_ncomp=4
+
+# -- PLS-DA ncomp selection --
+plsda_ncomp_select_method="1err"  # options are "min", "1err" and "randomization"
+plsda_ncomp_select_plot_symbol_size=2
+plsda_ncomp_select_plot_legend_size=9
+plsda_ncomp_select_plot_x_label_size=10
+plsda_ncomp_select_plot_x_tick_label_size=10
+plsda_ncomp_select_plot_y_label_size=10
+plsda_ncomp_select_plot_y_tick_label_size=10
+
+# -- PLS-DA permutation test --
+plsda_perm_method="by_y"  # options are "by_y" and "by_feature_per_y"
+plsda_perm_n=999
+plsda_perm_plot_symbol_size=2
+plsda_perm_plot_legend_size=9
+plsda_perm_plot_x_label_size=10
+plsda_perm_plot_x_tick_label_size=6
+plsda_perm_plot_y_label_size=10
+plsda_perm_plot_y_tick_label_size=10
+plsda_perm_plot_width=250
+plsda_perm_plot_height=150
+
+# -- PLS-DA score plot --
+# NOTE below: some scoreplot settings share with the all connections PCA biplot
+plsda_scoreplot_ellipse_conf=0.95
+
+# -- PLS-DA ROC-AUC --
+# NOTE: some ROC settings share with the SVM ROC
+plsda_roc_smooth=FALSE
+
+# -- PLS-DA VIP analysis --
+plsda_vip_alpha=0.8  # 0.8~1 is good
+plsda_vip_boot=TRUE
+plsda_vip_boot_n=50
+plsda_vip_plot_errorbar="SEM"  # options are "SEM" and "SD"
+plsda_vip_plot_errorbar_width=0.2
+plsda_vip_plot_errorbar_label_size=6
+plsda_vip_plot_x_textangle=90
+plsda_vip_plot_x_label_size=10
+plsda_vip_plot_x_tick_label_size=4
+plsda_vip_plot_y_label_size=10
+plsda_vip_plot_y_tick_label_size=10
+plsda_vip_plot_width=150
+plsda_vip_plot_height=100
