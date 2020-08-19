@@ -265,7 +265,7 @@ server <- function(input, output, session) {
     })
 
     annotations <- reactive({
-        
+        req(xt)
         if (xt == "csv"){
             req(input$file_data)
             print("annotations 2D data!!")
@@ -286,6 +286,7 @@ server <- function(input, output, session) {
     })
 
     node <- reactive({
+        req(xt)
         if(xt == "csv"){
             print("node 2D data!!!!")
         } else {
@@ -306,7 +307,7 @@ server <- function(input, output, session) {
 
     output$variables <- renderUI({
         req(input$file_data)
-
+        xt <<- tools::file_ext(input$file_data$datapath)
         print(xt)
         if(xt == "csv"){
 
@@ -615,6 +616,7 @@ server <- function(input, output, session) {
 
     output$groups <- renderUI({
         req(input$file_data)
+        xt <<- tools::file_ext(input$file_data$datapath)
         if(xt == "csv"){
              print("contrast !! file 2d!")
             
@@ -909,8 +911,6 @@ server <- function(input, output, session) {
                                                  c[i].style.fontWeight = "bold";
 
                                                  }
-                                                 console.log("yeeeeeehehehrerhq;lrehq;werh");
-
                                                  }}'),
                         onAdd = sortable_js_capture_input("contrast_group2")
                     )
@@ -1128,7 +1128,7 @@ server <- function(input, output, session) {
     output$training <- DT::renderDataTable({
         datatable(
             # training()[[1, 1]][, , 1],
-            training()[,1:40,1], ######### change this after
+            training()[,1:10,1], ######### change this after
             
             options = list(
                 autoWidth = TRUE,
@@ -1401,26 +1401,23 @@ server <- function(input, output, session) {
         # converting PDF results to PNGs to display in renderImage()
         pdf.list <-
             list.files(path = file.path(tempdir(), 'OUTPUT', 'UNIVARIATE'),
-                       pattern = ".pdf$")
-        lapply(
-            pdf.list,
-            FUN = function(files) {
-                pdf_convert(
-                    files,
-                    format = "png",
-                    filenames = paste0(
-                        sep = "",
-                        "PNGFILES/" ,
-                        tools::file_path_sans_ext(files),
-                        ".png"
-                    )
-                )
-            }
-        )
+                       pattern = ".pdf$", full.names=TRUE)
+        
+        pdf_convert(pdf.list[1], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[1]), ".png"))
+        pdf_convert(pdf.list[2], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[2]), ".png"))
+        pdf_convert(pdf.list[3], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[3]), ".png"))
+        pdf_convert(pdf.list[4], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[4]), ".png"))
+        pdf_convert(pdf.list[5], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[5]), ".png"))
+        pdf_convert(pdf.list[6], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[6]), ".png"))
+        pdf_convert(pdf.list[7], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[7]), ".png"))
+        # lapply(1:length(pdf.list), function(i){
+        #     pdf_convert(pdf.list[i], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[i]), ".png"))
+        # })
+        
         #updating the Select Input with the png filenames
         filenames <-
             list.files(
-                path = file.path(tempdir(), 'OUTPUT', 'UNIVARIATE', 'PNGFILES'),
+                path = file.path(tempdir(), 'OUTPUT', 'UNIVARIATE'),
                 pattern = ".png$",
                 full.names = FALSE
             )
@@ -1473,33 +1470,57 @@ server <- function(input, output, session) {
         inputArgs[10] <- cores
         inputArgs[62] <- cvuni
         inputArgs[64] <- contrast
+        
+        withConsoleRedirect("console", {
+            ml_svm(inputArgs)
+            
+        })
 
-        ml_svm(inputArgs)
+        
 
         # converting PDF results to PNGs to display in renderImage()
         pdf.list <-
             list.files(path = file.path(tempdir(), 'OUTPUT', 'ML_SVM'),
                        pattern = ".pdf$")
-        lapply(
-            pdf.list,
-            FUN = function(files) {
-                pdf_convert(
-                    files,
-                    format = "png",
-                    filenames = paste0(
-                        sep = "",
-                        "PNGFILES/" ,
-                        tools::file_path_sans_ext(files),
-                        ".png"
-                    )
-                )
-            }
-        )
+
+        pdf_convert(pdf.list[1], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[1]), ".png"))
+        pdf_convert(pdf.list[2], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[2]), ".png"))
+        pdf_convert(pdf.list[3], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[3]), ".png"))
+        pdf_convert(pdf.list[4], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[4]), ".png"))
+        pdf_convert(pdf.list[5], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[5]), ".png"))
+        pdf_convert(pdf.list[6], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[6]), ".png"))
+        pdf_convert(pdf.list[7], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[7]), ".png"))
+        pdf_convert(pdf.list[8], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[8]), ".png"))
+        pdf_convert(pdf.list[9], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[9]), ".png"))
+        pdf_convert(pdf.list[10], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[10]), ".png"))
+        pdf_convert(pdf.list[11], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[11]), ".png"))
+        pdf_convert(pdf.list[12], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[12]), ".png"))
+        pdf_convert(pdf.list[13], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[13]), ".png"))
+        pdf_convert(pdf.list[14], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[14]), ".png"))
+        pdf_convert(pdf.list[15], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[15]), ".png"))
+        pdf_convert(pdf.list[16], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[16]), ".png"))
+        pdf_convert(pdf.list[17], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[17]), ".png"))
+        pdf_convert(pdf.list[18], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[18]), ".png"))
+        # lapply(
+        #     pdf.list,
+        #     FUN = function(files) {
+        #         pdf_convert(
+        #             files,
+        #             format = "png",
+        #             filenames = paste0(
+        #                 sep = "",
+        #                 "PNGFILES/" ,
+        #                 tools::file_path_sans_ext(files),
+        #                 ".png"
+        #             )
+        #         )
+        #     }
+        # )
 
         #updating the Select Input with the png filenames
         files <-
             list.files(
-                path = file.path(tempdir(), 'OUTPUT', 'ML_SVM', 'PNGFILES'),
+                path = file.path(tempdir(), 'OUTPUT', 'ML_SVM'),
                 pattern = ".png$",
                 full.names = FALSE
             )
@@ -1524,7 +1545,6 @@ server <- function(input, output, session) {
                 tempdir(),
                 'OUTPUT',
                 'UNIVARIATE',
-                'PNGFILES',
                 input$select_uni_plot
             ),
             alt = "Univariate plots",
@@ -1535,13 +1555,12 @@ server <- function(input, output, session) {
     }, deleteFile = FALSE)
 
     output$svm_plots <- renderImage({
-        # req(input$svm)
+        req(input$svm)
         list(
             src = file.path(
                 tempdir(),
                 'OUTPUT',
                 'ML_SVM',
-                'PNGFILES',
                 input$select_svm_plot
             ),
             alt = "SVM plots",
@@ -1559,10 +1578,9 @@ server <- function(input, output, session) {
         },
         content = function(file) {
             tempReport <- normalizePath(file.path(tempdir(), 'results.Rmd'))
-            print("YOS!!!")
-            file.copy(normalizePath(file.path('results.Rmd')), tempReport, overwrite = TRUE)
-            params <- list(n = 100)
+            file.copy(file.path(getwd(), 'results.Rmd'), tempReport, overwrite = TRUE)
             rmarkdown::render(input = tempReport)
+            # tinytex::pdflatex('results.tex')
             file.copy(file.path(tempdir(), 'results.pdf'), file)
         }
         
@@ -1590,7 +1608,8 @@ server <- function(input, output, session) {
 
     reg_training <- reactive({
         req(input$reg_file_data)
-        reg_xt <<- tools::file_ext(input$file_data$datapath) 
+        reg_xt <<- tools::file_ext(input$reg_file_data$datapath)
+        print(reg_xt)
         dater = matrix(list(),
                        nrow = 1,
                        ncol = length(input$reg_file_data$name))
@@ -1601,7 +1620,7 @@ server <- function(input, output, session) {
             df <- df[[1]]
             dater[[1, 1]] <- df
         } else if (reg_xt == "csv") {
-            df <- read.csv(input$file_data$datapath,
+            df <- read.csv(input$reg_file_data$datapath,
                            header = TRUE,
                            sep = ",")
             dater[[1, 1]] <- df
@@ -1756,7 +1775,7 @@ server <- function(input, output, session) {
                             group = list(
                                 group = "allvars",
                                 put = htmlwidgets::JS(
-                                    'function (to) { document.getElementById("reg_chosen_sample").style.backgroundColor = "#86c29c"; return to.el.children.length < 1; }'
+                                    'function (to) { return to.el.children.length < 1; }'
                                 ),
                                 pull = htmlwidgets::JS(
                                     'function (to) { document.getElementById("reg_chosen_sample").style.backgroundColor = "white"; }'
@@ -1772,7 +1791,7 @@ server <- function(input, output, session) {
                             group = list(
                                 group = "reg_allvars",
                                 put = htmlwidgets::JS(
-                                    'function (to) { document.getElementById("reg_chosen_group").style.backgroundColor = "#86c29c"; return to.el.children.length < 1; }'
+                                    'function (to) { return to.el.children.length < 1; }'
                                 ),
                                 pull = htmlwidgets::JS(
                                     'function (to) { document.getElementById("reg_chosen_group").style.backgroundColor = "white"; }'
@@ -1789,7 +1808,7 @@ server <- function(input, output, session) {
                             group = list(
                                 group = "reg_allvars",
                                 put = htmlwidgets::JS(
-                                    'function (to) { document.getElementById("reg_chosen_node").style.backgroundColor = "#86c29c"; return to.el.children.length < 1; }'
+                                    'function (to) { return to.el.children.length < 1; }'
                                 ),
                                 pull = htmlwidgets::JS(
                                     'function (to) { document.getElementById("reg_chosen_node").style.backgroundColor = "white"; }'
@@ -1805,7 +1824,7 @@ server <- function(input, output, session) {
                             group = list(
                                 group = "reg_allvars",
                                 put = htmlwidgets::JS(
-                                    'function (to) { document.getElementById("reg_chosen_region").style.backgroundColor = "#86c29c"; return to.el.children.length < 1; }'
+                                    'function (to) { return to.el.children.length < 1; }'
                                 ),
                                 pull = htmlwidgets::JS(
                                     'function (to) { document.getElementById("reg_chosen_region").style.backgroundColor = "white"; }'
@@ -1863,12 +1882,6 @@ server <- function(input, output, session) {
                                      "Group 1"),
                             tags$div(class = "panel-body",
                                      id = "reg_contrast1"),
-                            tags$style(HTML(
-                                '.contrast1:hover {
-                            background-color: #a29293
-                            }
-                                '
-                            ))
                         )
                     ),
                     column(width = 1,
@@ -2270,7 +2283,7 @@ server <- function(input, output, session) {
     observeEvent(input$reg_univariate, {
         req(input$reg_file_data, input$reg_file_annotations, input$reg_file_node)
         
-        unlink(file.path(temdir(), 'OUTPUT'), recursive = TRUE, force = TRUE)
+        # unlink(file.path(tempdir(), 'OUTPUT'), recursive = TRUE, force = TRUE)
 
         # do.call(file.remove, list(list.files(
         #     file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE'),
@@ -2348,7 +2361,6 @@ server <- function(input, output, session) {
                     format = "png",
                     filenames = paste0(
                         sep = "",
-                        "PNGFILES/" ,
                         tools::file_path_sans_ext(files),
                         ".png"
                     )
@@ -2358,7 +2370,7 @@ server <- function(input, output, session) {
         #updating the Select Input with the png filenames
         filenames <-
             list.files(
-                path = normalizePath(file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE', 'PNGFILES')),
+                path = normalizePath(file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE')),
                 pattern = ".png$",
                 full.names = FALSE
             )
@@ -2413,32 +2425,53 @@ server <- function(input, output, session) {
         inputArgs[56] <- cvuni
         inputArgs[64] <- contrast
 
-        reg_ml_svm(inputArgs)
+
+        withConsoleRedirect("reg_console", {
+            # invalidateLater(100)
+            reg_ml_svm(inputArgs)
+
+        })
+        
 
         # converting PDF results to PNGs to display in renderImage()
         pdf.list <-
             list.files(path = file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'ML_SVM'),
                        pattern = ".pdf$")
-        lapply(
-            pdf.list,
-            FUN = function(files) {
-                pdf_convert(
-                    files,
-                    format = "png",
-                    filenames = paste0(
-                        sep = "",
-                        "PNGFILES/" ,
-                        tools::file_path_sans_ext(files),
-                        ".png"
-                    )
-                )
-            }
-        )
+
+        # pdf_convert(pdf.list[1], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[1]), ".png"))
+        # pdf_convert(pdf.list[2], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[2]), ".png"))
+        # # pdf_convert(pdf.list[3], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[3]), ".png"))
+        # pdf_convert(pdf.list[4], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[4]), ".png"))
+        # pdf_convert(pdf.list[5], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[5]), ".png"))
+        # pdf_convert(pdf.list[6], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[6]), ".png"))
+        # pdf_convert(pdf.list[7], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[7]), ".png"))
+        # pdf_convert(pdf.list[8], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[8]), ".png"))
+        # pdf_convert(pdf.list[9], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[9]), ".png"))
+        # pdf_convert(pdf.list[10], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[10]), ".png"))
+        # pdf_convert(pdf.list[11], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[11]), ".png"))
+        # pdf_convert(pdf.list[12], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[12]), ".png"))
+        # pdf_convert(pdf.list[13], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[13]), ".png"))
+        # pdf_convert(pdf.list[14], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[14]), ".png"))
+        # lapply(
+        #     pdf.list,
+        #     FUN = function(files) {
+        #         pdf_convert(
+        #             files,
+        #             format = "png",
+        #             filenames = paste0(
+        #                 sep = "",
+        #                 "PNGFILES/" ,
+        #                 tools::file_path_sans_ext(files),
+        #                 ".png"
+        #             )
+        #         )
+        #     }
+        # )
 
         #updating the Select Input with the png filenames
         filenames <-
             list.files(
-                path = file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'ML_SVM', 'PNGFILES'),
+                path = file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'ML_SVM'),
                 pattern = ".png$",
                 full.names = FALSE
             )
@@ -2463,10 +2496,9 @@ server <- function(input, output, session) {
                 'OUTPUT',
                 'REGRESSION',
                 'UNIVARIATE',
-                'PNGFILES',
                 input$reg_select_uni_plot
             ),
-            alt = "Uniariate plots",
+            alt = "Univariate plots",
             width = 400,
             height = 400
         )
@@ -2481,7 +2513,6 @@ server <- function(input, output, session) {
                 'OUTPUT',
                 'REGRESSION',
                 'ML_SVM',
-                'PNGFILES',
                 input$reg_select_svm_plot
             ),
             alt = "SVM plots",
