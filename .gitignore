@@ -70,3 +70,4 @@ RBioFS/svm_nested_iter_10.rffs.sfs.plot.pdf
 RBioFS/svm_nested_iter_10.SFS.error_table.csv
 RBioFS/svm_nested_iter_10.SFS.txt
 RBioFS/rsconnect/shinyapps.io/sergiu-mocanu/RBioFS.dcf
+packrat/lib*/

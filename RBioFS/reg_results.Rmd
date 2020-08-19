@@ -1,0 +1,31 @@
+---
+title: "Regression Machine Learning Analysis Results"
+author: "Dunkley Lab"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  pdf_document:
+    fig_caption: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(fig.path=file.path(tempdir(), 'OUTPUT/REGRESSION/UNIVARIATE/'), echo = FALSE)
+```
+
+
+This is a report of all the images generated via the Univariate analysis. We can format this code using LaTex formatting. These first plots are for UNIVARIATE analysis.
+
+```{r, echo=FALSE}
+myimages<-normalizePath(list.files(file.path(tempdir(), 'OUTPUT/REGRESSION/UNIVARIATE/'), pattern = ".pdf", full.names = TRUE))
+myimages <- gsub("\\\\", "/", myimages)
+knitr::include_graphics(myimages)
+```
+
+The SVM plots follow.
+
+
+```{r, echo=FALSE}
+myimages<-normalizePath(list.files(file.path(tempdir(), 'OUTPUT/REGRESSION/ML_SVM/'), pattern = ".pdf", full.names = TRUE))
+myimages <- gsub("\\\\", "/", myimages)
+knitr::include_graphics(myimages)
+```

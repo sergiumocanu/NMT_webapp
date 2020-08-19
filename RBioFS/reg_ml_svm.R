@@ -6,20 +6,22 @@
 ## flags from Rscript
 # NOTE: the order of the flags depends on the Rscript command
 # args <- commandArgs()
-
 # print(args)
-  ######  load libraries --------
-require(RBioFS)
-require(RBioArray)
-require(foreach)
-require(parallel)
-require(limma)
+reg_ml_svm <- function(args) {
 
-ml_svm <- function (args) {
+######  load libraries --------
+  require(RBioFS)
+  require(RBioArray)
+  require(foreach)
+  require(parallel)
+  require(limma)
+  require(splines)
+
 
   ###### sys variables --------
   # ------ warning flags ------
   CORE_OUT_OF_RANGE <- FALSE
+  SVM_ROC_THRESHOLD_OUT_OF_RANGE <- FALSE
   
   # ------ file name variables ------
   DAT_FILE <- args[6]  # ML file
@@ -73,55 +75,36 @@ ml_svm <- function (args) {
   SVM_PERM_PLOT_WIDTH <- as.numeric(args[34])
   SVM_PERM_PLOT_HEIGHT <- as.numeric(args[35])
   
-  SVM_ROC_SMOOTH <- eval(parse(text = args[36]))
-  SVM_ROC_SYMBOL_SIZE <- as.numeric(args[37])
-  SVM_ROC_LEGEND_SIZE <- as.numeric(args[38])
-  SVM_ROC_X_LABEL_SIZE <- as.numeric(args[39])
-  SVM_ROC_X_TICK_LABEL_SIZE <- as.numeric(args[40])
-  SVM_ROC_Y_LABEL_SIZE <- as.numeric(args[41])
-  SVM_ROC_Y_TICK_LABEL_SIZE <- as.numeric(args[42])
-  SVM_ROC_WIDTH <- as.numeric(args[43])
-  SVM_ROC_HEIGHT <- as.numeric(args[44])
+  SVM_ROC_THRESHOLD <- as.numeric(args[36])
+  SVM_ROC_SMOOTH <- eval(parse(text = args[37]))
+  SVM_ROC_SYMBOL_SIZE <- as.numeric(args[38])
+  SVM_ROC_LEGEND_SIZE <- as.numeric(args[39])
+  SVM_ROC_X_LABEL_SIZE <- as.numeric(args[40])
+  SVM_ROC_X_TICK_LABEL_SIZE <- as.numeric(args[41])
+  SVM_ROC_Y_LABEL_SIZE <- as.numeric(args[42])
+  SVM_ROC_Y_TICK_LABEL_SIZE <- as.numeric(args[43])
+  SVM_ROC_WIDTH <- as.numeric(args[44])
+  SVM_ROC_HEIGHT <- as.numeric(args[45])
   
-  PCA_SCALE_DATA <- eval(parse(text = args[45]))
-  PCA_CENTRE_DATA <- eval(parse(text = args[46]))
-  PCA_BIPLOT_SAMPLELABEL_TYPE <- args[47]
-  PCA_BIPLOT_SAMPLELABEL_SIZE <- as.numeric(args[48])
-  PCA_BIPLOT_SYMBOL_SIZE <- as.numeric(args[49])
-  PCA_BIPLOT_ELLIPSE <- eval(parse(text = args[50]))
-  PCA_BIPLOT_LOADING <- eval(parse(text = args[51]))
-  PCA_BIPLOT_LOADING_TEXTSIZE <- as.numeric(args[52])
-  PCA_BIPLOT_MULTI_DESITY <- eval(parse(text = args[53]))
-  PCA_BIPLOT_MULTI_STRIPLABEL_SIZE <- as.numeric(args[54])
-  PCA_RIGHTSIDE_Y <- eval(parse(text = args[55]))
-  PCA_X_TICK_LABEL_SIZE <- as.numeric(args[56])
-  PCA_Y_TICK_LABEL_SIZE <- as.numeric(args[57])
-  PCA_WIDTH <- as.numeric(args[58])
-  PCA_HEIGHT <- as.numeric(args[59])
-  SVM_RFFS_PCA_PC <- eval(parse(text = args[60]))
-  SVM_RFFS_PCA_BIPLOT_ELLIPSE_CONF <- as.numeric(args[61])
+  RFFS_HTMAP_TEXTSIZE_COL <- as.numeric(args[46])
+  RFFS_HTMAP_TEXTANGLE_COL <- as.numeric(args[47])
+  HTMAP_LAB_ROW <- eval(parse(text = args[48]))
+  RFFS_HTMAP_TEXTSIZE_ROW <- as.numeric(args[49])
+  RFFS_HTMAP_KEYSIZE <- as.numeric(args[50])
+  RFFS_HTMAP_KEY_XLAB <- args[51]
+  RFFS_HTMAP_KEY_YLAB <- args[52]
+  RFFS_HTMAP_MARGIN <- eval(parse(text = args[53]))
+  RFFS_HTMAP_WIDTH <- as.numeric(args[54])
+  RFFS_HTMAP_HEIGHT <- as.numeric(args[55])
   
   # below: for if to do the univariate redution
-  CVUNI <- eval(parse(text = args[62]))
-  LOG2_TRANS <- eval(parse(text = args[63]))
-  CONTRAST <- args[64]
-  UNI_FDR <- eval(parse(text = args[65]))
-  UNI_ALPHA <- as.numeric(args[66])
-  
-  # below: RFFS heatmap
-  RFFS_HTMAP_TEXTSIZE_COL <- as.numeric(args[67])
-  RFFS_HTMAP_TEXTANGLE_COL <- as.numeric(args[68])
-  HTMAP_LAB_ROW <- eval(parse(text = args[69]))
-  RFFS_HTMAP_TEXTSIZE_ROW <- as.numeric(args[70])
-  RFFS_HTMAP_KEYSIZE <- as.numeric(args[71])
-  RFFS_HTMAP_KEY_XLAB <- args[72]
-  RFFS_HTMAP_KEY_YLAB <- args[73]
-  RFFS_HTMAP_MARGIN <- eval(parse(text = args[74]))
-  RFFS_HTMAP_WIDTH <- as.numeric(args[75])
-  RFFS_HTMAP_HEIGHT <- as.numeric(args[76])
+  CVUNI <- eval(parse(text = args[56]))
+  LOG2_TRANS <- eval(parse(text = args[57]))
+  UNI_FDR <- eval(parse(text = args[58]))
+  UNI_ALPHA <- as.numeric(args[59])
   
   # random state
-  RANDOM_STATE <- as.numeric(args[77])
+  RANDOM_STATE <- as.numeric(args[60])
   
   ###### R script --------
   # ------ set random state if available
@@ -137,50 +120,49 @@ ml_svm <- function (args) {
     read.csv(file = DAT_FILE,
              stringsAsFactors = FALSE,
              check.names = FALSE)
-  ml_dfm$y <- factor(ml_dfm$y, levels = unique(ml_dfm$y))
-  
-  # stratified resampling: proportionally sample by groups
-  training <- foreach(i = levels(ml_dfm$y), .combine = "rbind") %do% {
-    dfm <- ml_dfm[ml_dfm$y == i,]
-    dfm_rand <- dfm[sample(nrow(dfm)),]
-    training_n <- ceiling(nrow(dfm_rand) * TRAINING_PERCENTAGE)
-    training <- dfm_rand[1:training_n,]
-  }
-  test <- ml_dfm[!rownames(ml_dfm) %in% rownames(training),]
+  ml_dfm_randomized <- ml_dfm[sample(nrow(ml_dfm)),]
+  training_n <-
+    ceiling(nrow(ml_dfm_randomized) * TRAINING_PERCENTAGE)  # use ceiling to maximize the training set size
+  training <- ml_dfm_randomized[1:training_n,]
+  training_sampleid <- training$sampleid
+  training <- training[,-1]  # remove sampleid
+  test <-
+    ml_dfm_randomized[(training_n + 1):nrow(ml_dfm_randomized),]
+  test <- test[,-1]  # remove sampleid
+  # load(file = paste0(RES_OUT_DIR, "/normdata.Rdata"))
   
   # ------ internal nested cross-validation and feature selection ------
-  sink(file = paste0(MAT_FILE_NO_EXT, "_svm_results.txt"),
-       append = TRUE)
+  # sink(file = paste0(MAT_FILE_NO_EXT, "_svm_results.txt"),
+  #      append = TRUE)
   cat("------ Internal nested cross-validation with rRF-FS ------\n")
-  svm_nested_cv <-
-    rbioClass_svm_ncv_fs(
-      x = training[,!colnames(training) %in% c("sampleid", "y")],
-      y = factor(training$y, levels = unique(training$y)),
-      univariate.fs = CVUNI,
-      uni.log2trans = LOG2_TRANS,
-      uni.fdr = UNI_FDR,
-      uni.alpha = UNI_ALPHA,
-      uni.contrast = CONTRAST,
-      center.scale = SVM_CV_CENTRE_SCALE,
-      cross.k = SVM_CV_CROSS_K,
-      tune.method = SVM_CV_TUNE_METHOD,
-      tune.cross.k = SVM_CV_TUNE_CROSS_K,
-      tune.boot.n = SVM_CV_TUNE_BOOT_N,
-      fs.method = "rf",
-      rf.ifs.ntree = SVM_CV_FS_RF_IFS_NTREE,
-      rf.sfs.ntree = SVM_CV_FS_RF_SFS_NTREE,
-      fs.count.cutoff = SVM_CV_FS_COUNT_CUTOFF,
-      cross.best.model.method = SVM_CV_BEST_MODEL_METHOD,
-      parallelComputing = PSETTING,
-      n_cores = CORES,
-      clusterType = CPU_CLUSTER,
-      verbose = TRUE
-    )
-  sink()
+  svm_nested_cv <- rbioClass_svm_ncv_fs(
+    x = training[,-1],
+    y = training$y,
+    center.scale = SVM_CV_CENTRE_SCALE,
+    univariate.fs = CVUNI,
+    uni.log2trans = LOG2_TRANS,
+    uni.fdr = UNI_FDR,
+    uni.alpha = UNI_ALPHA,
+    cross.k = SVM_CV_CROSS_K,
+    tune.method = SVM_CV_TUNE_METHOD,
+    tune.cross.k = SVM_CV_TUNE_CROSS_K,
+    tune.boot.n = SVM_CV_TUNE_BOOT_N,
+    fs.method = "rf",
+    rf.ifs.ntree = SVM_CV_FS_RF_IFS_NTREE,
+    rf.sfs.ntree = SVM_CV_FS_RF_SFS_NTREE,
+    fs.count.cutoff = SVM_CV_FS_COUNT_CUTOFF,
+    cross.best.model.method = SVM_CV_BEST_MODEL_METHOD,
+    parallelComputing = PSETTING,
+    n_cores = CORES,
+    clusterType = CPU_CLUSTER,
+    verbose = TRUE
+  )
+  # sink()
   svm_rf_selected_pairs <- svm_nested_cv$selected.features
   rffs_selected_dfm <-
     ml_dfm[, colnames(ml_dfm) %in% c("sampleid", "y", svm_rf_selected_pairs)]  # training + testing
   
+  # plot SFS results
   for (i in 1:SVM_CV_CROSS_K) {
     # plot SFS curve
     rbioFS_rf_SFS_plot(
@@ -201,7 +183,7 @@ ml_svm <- function (args) {
       plot.xvAlign = 0.5,
       plot.xTickItalic = FALSE,
       plot.xTickBold = FALSE,
-      plot.yLabel = "OOB error rate",
+      plot.yLabel = "MSE",
       plot.yLabelSize = SVM_ROC_Y_LABEL_SIZE,
       plot.yTickLblSize = SVM_ROC_Y_TICK_LABEL_SIZE,
       plot.yTickItalic = FALSE,
@@ -218,21 +200,19 @@ ml_svm <- function (args) {
   # sub set the training/test data using the selected features
   svm_training <- training[, c("y", svm_rf_selected_pairs)]
   svm_test <- test[, c("y", svm_rf_selected_pairs)]
-  training_sampleid <- training$sampleid
   
   # modelling
-  svm_m <-
-    rbioClass_svm(
-      x = svm_training[,-1],
-      y = factor(svm_training$y, levels = unique(svm_training$y)),
-      center.scale = SVM_CV_CENTRE_SCALE,
-      kernel = SVM_CV_KERNEL,
-      svm.cross.k = SVM_CROSS_K,
-      tune.method = SVM_CV_TUNE_METHOD,
-      tune.cross.k = SVM_TUNE_CROSS_K,
-      tune.boot.n = SVM_TUNE_BOOT_N,
-      verbose = FALSE
-    )
+  svm_m <- rbioClass_svm(
+    x = svm_training[,-1],
+    y = svm_training$y,
+    center.scale = SVM_CV_CENTRE_SCALE,
+    kernel = SVM_CV_KERNEL,
+    svm.cross.k = SVM_CROSS_K,
+    tune.method = SVM_CV_TUNE_METHOD,
+    tune.cross.k = SVM_TUNE_CROSS_K,
+    tune.boot.n = SVM_TUNE_BOOT_N,
+    verbose = FALSE
+  )
   
   # permuation test and plotting
   rbioClass_svm_perm(
@@ -256,115 +236,22 @@ ml_svm <- function (args) {
     plot.Height = SVM_PERM_PLOT_HEIGHT
   )
   
-  sink(file = paste0(MAT_FILE_NO_EXT, "_svm_results.txt"),
-       append = TRUE)
+  # sink(file = paste0(MAT_FILE_NO_EXT, "_svm_results.txt"),
+  #      append = TRUE)
   cat("\n\n------ Permutation test ------\n")
   svm_m_perm
-  sink()
+  # sink()
   
   # ROC-AUC
+  if (any(SVM_ROC_THRESHOLD < 0) ||
+      any(SVM_ROC_THRESHOLD > max(svm_m$inputY))) {
+    SVM_ROC_THRESHOLD_OUT_OF_RANGE <- TRUE
+    SVM_ROC_THRESHOLD <- round(median(svm_m$inputY))
+  }
+  
   sink(file = paste0(MAT_FILE_NO_EXT, "_svm_results.txt"),
        append = TRUE)
-  cat("------ ROC-AUC ------\n")
-  rbioClass_svm_roc_auc(
-    object = svm_m,
-    newdata = svm_test[,-1],
-    newdata.label = factor(svm_test$y, levels = unique(svm_test$y)),
-    center.scale.newdata = SVM_CV_CENTRE_SCALE,
-    plot.smooth = SVM_ROC_SMOOTH,
-    plot.legendSize = SVM_ROC_LEGEND_SIZE,
-    plot.SymbolSize = SVM_ROC_SYMBOL_SIZE,
-    plot.xLabelSize = SVM_ROC_X_LABEL_SIZE,
-    plot.xTickLblSize = SVM_ROC_X_TICK_LABEL_SIZE,
-    plot.yLabelSize = SVM_ROC_Y_LABEL_SIZE,
-    plot.yTickLblSize = SVM_ROC_Y_TICK_LABEL_SIZE,
-    plot.Width = SVM_ROC_WIDTH,
-    plot.Height = SVM_ROC_HEIGHT,
-    verbose = FALSE
-  )
-  sink()
   
-  # FS PCA on training
-  pca_svm_rffs_training <-
-    data.frame(row_num = 1:nrow(svm_training),
-               svm_training,
-               check.names = FALSE)
-  rbioFS_PCA(
-    input = pca_svm_rffs_training,
-    sampleIDVar = "row_num",
-    groupIDVar = "y",
-    scaleData = PCA_SCALE_DATA,
-    centerData = PCA_CENTRE_DATA,
-    boxplot = TRUE,
-    boxplot.Title = NULL,
-    boxplot.Width = PCA_WIDTH,
-    boxplot.Height = PCA_HEIGHT,
-    biplot = TRUE,
-    biplot.comps = SVM_RFFS_PCA_PC,
-    biplot.Title = NULL,
-    biplot.sampleLabel.type = PCA_BIPLOT_SAMPLELABEL_TYPE,
-    biplot.sampleLabelSize = PCA_BIPLOT_SAMPLELABEL_SIZE,
-    biplot.sampleLabel.padding = 0.5,
-    biplot.SymbolSize = PCA_BIPLOT_SYMBOL_SIZE,
-    biplot.ellipse = PCA_BIPLOT_ELLIPSE,
-    biplot.ellipse_conf = SVM_RFFS_PCA_BIPLOT_ELLIPSE_CONF,
-    biplot.xAngle = 0,
-    biplot.xhAlign = 0.5,
-    biplot.xvAlign = 0.5,
-    biplot.loadingplot = PCA_BIPLOT_LOADING,
-    biplot.loadingplot.textsize = PCA_BIPLOT_LOADING_TEXTSIZE,
-    biplot.mtx.densityplot = PCA_BIPLOT_MULTI_DESITY,
-    biplot.mtx.stripLblSize = PCA_BIPLOT_MULTI_STRIPLABEL_SIZE,
-    biplot.Width = PCA_WIDTH,
-    biplot.Height = PCA_HEIGHT,
-    rightsideY = PCA_RIGHTSIDE_Y,
-    fontType = "sans",
-    xTickLblSize = PCA_X_TICK_LABEL_SIZE,
-    yTickLblSize = PCA_Y_TICK_LABEL_SIZE,
-    verbose = FALSE
-  )
-  
-  # below: FS PCA on all data
-  pca_svm_rffs_all_samples <-
-    data.frame(
-      row_num = 1:nrow(rffs_selected_dfm),
-      rffs_selected_dfm[,!colnames(rffs_selected_dfm) %in% "sampleid"],
-      check.names = FALSE
-    )
-  rbioFS_PCA(
-    input = pca_svm_rffs_all_samples,
-    sampleIDVar = "row_num",
-    groupIDVar = "y",
-    scaleData = PCA_SCALE_DATA,
-    centerData = PCA_CENTRE_DATA,
-    boxplot = TRUE,
-    boxplot.Title = NULL,
-    boxplot.Width = PCA_WIDTH,
-    boxplot.Height = PCA_HEIGHT,
-    biplot = TRUE,
-    biplot.comps = SVM_RFFS_PCA_PC,
-    biplot.Title = NULL,
-    biplot.sampleLabel.type = PCA_BIPLOT_SAMPLELABEL_TYPE,
-    biplot.sampleLabelSize = PCA_BIPLOT_SAMPLELABEL_SIZE,
-    biplot.sampleLabel.padding = 0.5,
-    biplot.SymbolSize = PCA_BIPLOT_SYMBOL_SIZE,
-    biplot.ellipse = PCA_BIPLOT_ELLIPSE,
-    biplot.ellipse_conf = SVM_RFFS_PCA_BIPLOT_ELLIPSE_CONF,
-    biplot.xAngle = 0,
-    biplot.xhAlign = 0.5,
-    biplot.xvAlign = 0.5,
-    biplot.loadingplot = PCA_BIPLOT_LOADING,
-    biplot.loadingplot.textsize = PCA_BIPLOT_LOADING_TEXTSIZE,
-    biplot.mtx.densityplot = PCA_BIPLOT_MULTI_DESITY,
-    biplot.mtx.stripLblSize = PCA_BIPLOT_MULTI_STRIPLABEL_SIZE,
-    biplot.Width = PCA_WIDTH,
-    biplot.Height = PCA_HEIGHT,
-    rightsideY = PCA_RIGHTSIDE_Y,
-    fontType = "sans",
-    xTickLblSize = PCA_X_TICK_LABEL_SIZE,
-    yTickLblSize = PCA_Y_TICK_LABEL_SIZE,
-    verbose = FALSE
-  )
   
   # hcluster after nested CV: all data
   rffs_selected_E <-
@@ -380,12 +267,13 @@ ml_svm <- function (args) {
     )), sample = rffs_selected_dfm$sampleid),
     ArrayWeight = NULL
   )
+  
   if (HTMAP_LAB_ROW) {
     rbioarray_hcluster(
       plotName = paste0(MAT_FILE_NO_EXT, "_hclust_nestedcv_all_samples"),
       fltlist = normdata_crosscv,
       n = "all",
-      fct = factor(rffs_selected_dfm$y, levels = unique(rffs_selected_dfm$y)),
+      fct = factor(svm_training$y, levels = unique(svm_training$y)),
       ColSideCol = FALSE,
       sampleName = normdata_crosscv$targets$sample,
       genesymbolOnly = FALSE,
@@ -410,7 +298,7 @@ ml_svm <- function (args) {
       plotName = paste0(MAT_FILE_NO_EXT, "_hclust_nestedcv_all_samples"),
       fltlist = normdata_crosscv,
       n = "all",
-      fct = factor(rffs_selected_dfm$y, levels = unique(rffs_selected_dfm$y)),
+      fct = factor(svm_training$y, levels = unique(svm_training$y)),
       ColSideCol = FALSE,
       sampleName = normdata_crosscv$targets$sample,
       genesymbolOnly = FALSE,
@@ -445,6 +333,7 @@ ml_svm <- function (args) {
                            training_sampleid),
     ArrayWeight = NULL
   )
+  
   if (HTMAP_LAB_ROW) {
     rbioarray_hcluster(
       plotName = paste0(MAT_FILE_NO_EXT, "_hclust_nestedcv_training"),
@@ -498,27 +387,38 @@ ml_svm <- function (args) {
     )
   }
   
-  ####### clean up the mess and export --------
-  ## variables for display
-  orignal_y <- factor(ml_dfm$y, levels = unique(ml_dfm$y))
-  orignal_y_summary <-
-    foreach(i = 1:length(levels(orignal_y)), .combine = "c") %do%
-    paste0(levels(orignal_y)[i], "(", summary(orignal_y)[i], ")")
   
-  training_y <- factor(training$y, levels = unique(training$y))
-  training_summary <-
-    foreach(i = 1:length(levels(training_y)), .combine = "c") %do%
-    paste0(levels(training_y)[i], "(", summary(training_y)[i], ")")
-  test_y <- factor(test$y, levels = unique(test$y))
-  test_summary <-
-    foreach(i = 1:length(levels(test_y)), .combine = "c") %do%
-    paste0(levels(test_y)[i], "(", summary(test_y)[i], ")")
+  ####### clean up the mess and export --------
+  ## clean up the mess from Pathview
+  suppressWarnings(rm(cpd.simtypes, gene.idtype.bods, gene.idtype.list, korg))
+  
+  # ## variables for display
+  # orignal_y <- factor(ml_dfm$y, levels = unique(ml_dfm$y))
+  # orignal_y_summary <- foreach(i = 1:length(levels(orignal_y)), .combine = "c") %do%
+  #   paste0(levels(orignal_y)[i], "(", summary(orignal_y)[i], ")")
+  #
+  # training_y <- factor(training$y, levels = unique(training$y))
+  # training_summary <- foreach(i = 1:length(levels(training_y)), .combine = "c") %do%
+  #   paste0(levels(training_y)[i], "(", summary(training_y)[i], ")")
+  # test_y <- factor(test$y, levels = unique(test$y))
+  # test_summary <- foreach(i = 1:length(levels(test_y)), .combine = "c") %do%
+  #   paste0(levels(test_y)[i], "(", summary(test_y)[i], ")")
   
   ## export to results files if needed
-  # y_randomized <- data.frame(`New order` = seq(length(ml_dfm_randomized$y)), `Randomized group labels` = ml_dfm_randomized$y,
-  #                            check.names = FALSE)
-  write.csv(file = "ml_training.csv", training, row.names = FALSE)
-  write.csv(file = "ml_test.csv", test, row.names = FALSE)
+  y_randomized <-
+    data.frame(
+      `New order` = seq(length(ml_dfm_randomized$y)),
+      `Randomized group labels` = ml_dfm_randomized$y,
+      check.names = FALSE
+    )
+  output_for_dl <- ml_dfm[, c("sampleid", "y", svm_rf_selected_pairs)]
+  
+  write.csv(file = "ml_randomized_group_label_order.csv", y_randomized, row.names = FALSE)
+  write.csv(
+    file = paste0(MAT_FILE_NO_EXT, "_dl.csv"),
+    output_for_dl,
+    row.names = FALSE
+  )
   save(
     list = c(
       "svm_m",
@@ -535,17 +435,16 @@ ml_svm <- function (args) {
   # cat("\t", dim(raw_sample_dfm), "\n") # line 1: file dimension
   # cat("First five variable names: ", names(raw_sample_dfm)[1:5])
   if (CORE_OUT_OF_RANGE) {
-    cat("WARNING: CPU core number out of range! Set to maximum cores - 1. \n")
+    cat("WARNING: CPU core out of range! Set to maximum cores - 1. \n")
     cat("-------------------------------------\n\n")
   }
   cat("ML data file summary\n")
   cat("-------------------------------------\n")
   cat("ML file dimensions: ", dim(ml_dfm), "\n")
-  cat("Group labels (size): ", orignal_y_summary, "\n")
   cat("\n\n")
   cat("Label randomization\n")
   cat("-------------------------------------\n")
-  cat("Training and test files saved to: ml_training.csv ml_test.csv\n")
+  cat("Randomized y order saved to file: ml_randomized_group_label_order.csv\n")
   cat("\n\n")
   cat("Data split\n")
   cat("-------------------------------------\n")
@@ -553,23 +452,30 @@ ml_svm <- function (args) {
       TRAINING_PERCENTAGE == 1)
     cat("Invalid percentage. Use default instead.\n")
   cat("Training set percentage: ", TRAINING_PERCENTAGE, "\n")
-  cat("Training set: ", training_summary, "\n")
-  cat("test set: ", test_summary, "\n")
   cat("\n\n")
   cat("SVM nested cross validation with rRF-FS\n")
   cat("-------------------------------------\n")
   svm_nested_cv
   cat("\n\n")
+  cat("Clustering analysis: SVM training data upon nested CV\n")
+  cat("-------------------------------------\n")
+  cat(
+    "Hierarchical clustering heatmap saved to: ",
+    paste0(MAT_FILE_NO_EXT, "_hclust_nestedcv.pdf\n")
+  )
+  cat("\n\n")
   cat("SVM modelling\n")
   cat("-------------------------------------\n")
   svm_m
-  cat("Total internal cross-validation accuracy: ",
-      svm_m$tot.accuracy / 100,
+  cat("Total internal cross-validation RMSE: ",
+      rbioReg_svm_rmse(object = svm_m),
       "\n")
   cat(
     "Final SVM model saved to file: ",
     paste0(MAT_FILE_NO_EXT, "_final_svm_model.Rdata\n")
   )
+  cat("Data with selected features saved to file: ",
+      paste0(MAT_FILE_NO_EXT, "_dl.csv\n"))
   cat("\n\n")
   cat("SVM permutation test\n")
   cat("-------------------------------------\n")
@@ -579,6 +485,8 @@ ml_svm <- function (args) {
   cat("\n\n")
   cat("ROC-AUC\n")
   cat("-------------------------------------\n")
+  if (SVM_ROC_THRESHOLD_OUT_OF_RANGE)
+    cat("ROC threshold(s) out of range: use median y value instead.\n\n")
   cat(
     "NOTE: Check the SVM results file ",
     paste0(MAT_FILE_NO_EXT, "_svm_results.txt"),
@@ -589,15 +497,7 @@ ml_svm <- function (args) {
   cat("Clustering analysis\n")
   # cat("PCA on SVM selected pairs\n")
   cat("-------------------------------------\n")
-  cat("PCA on CV-SVM-rRF-FS selected pairs saved to:\n")
-  cat("\tOn all data:\n")
-  cat("\t\tbiplot: pca_svm_rffs_all_samples.pca.biplot.pdf\n")
-  cat("\t\tboxplot: pca_svm_rffs_all_samples.pca.boxplot.pdf\n")
-  cat("\tOn training data:\n")
-  cat("\t\tbiplot: pca_svm_rffs_training.pca.biplot.pdf\n")
-  cat("\t\tboxplot: pca_svm_rffs_training.pca.boxplot.pdf\n")
-  cat("\n\n")
-  cat("Hierarchical clustering on CV-SVM-rRF-FS selected pairs saved to:\n")
+  cat("Hierarchical clustering on CV-SVR-rRF-FS selected pairs saved to:\n")
   cat("\tOn all data:\n")
   cat(
     "\t\t",
@@ -611,4 +511,5 @@ ml_svm <- function (args) {
   cat("\t\t",
       paste0(MAT_FILE_NO_EXT, "_hclust_nestedcv_training_heatmap.pdf"),
       "\n")
+  
 }
