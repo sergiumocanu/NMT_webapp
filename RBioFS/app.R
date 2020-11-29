@@ -13,6 +13,7 @@ library(shinyjs)
 library(shinyWidgets)
 library(shinyalert)
 library(shinyjqui)
+library(shinybusy)
 library(R.matlab)
 library(plyr)
 library(DT)
@@ -22,10 +23,6 @@ library(data.table)
 library(pdftools)
 library(rmarkdown)
 library(zip)
-# library(d3heatmap)
-# library(heatmaply)
-# library(threeBrain)
-# library(plotly)
 
 source("input_dat_process.R")
 source("univariate.R")
@@ -33,11 +30,17 @@ source("defaultconfig.R")
 source("ml_svm.R")
 source("configs_format.R")
 source("R/uiElements.R")
+source("R/serverElements.R")
 source("reg_input_dat_process.R")
 source("reg_univariate.R")
 source("reg_ml_svm.R")
 source("input_dat_process_2d.R")
 source("univariate_2D.R")
+source("reg_input_dat_process_2d.R")
+source("reg_univariate_2D.R")
+source("plsda_val_svm.R")
+source("cv_ml_svm.R")
+source("cv_plsda_val_svm.R")
 
 
 withConsoleRedirect <- function(containerId, expr) {
@@ -83,13 +86,18 @@ icon_list <- function(x) {
 
 # Define UI for application 
 ui <- dashboardPage(
+    
+    
+    
     # Header in top left of window
     dashboardHeader(title = "Connectivity Classification"),
     
     # sidebar menu items
     dashboardSidebar(sidebarMenu(
-        menuItem(text = "SVM Analysis", tabName = "svm"),
-        menuItem(text = "Regression Analysis", tabName = "regression")
+        menuItem(text = "Classification Analysis", tabName = "svm"),
+        menuItem(text = "Regression Analysis", tabName = "regression"),
+        menuItem(text = "CV-Only Classification Analysis", tabName = "cv"),
+        menuItem(text = "CV-Only Regression Analysis", tabName = "cv_regression")
     )),
     
     
@@ -97,8 +105,9 @@ ui <- dashboardPage(
     # Dashboard body items
     dashboardBody(tabItems(
         tabItem(
+            
             tabName = "svm",
-            # fluidRow(verbatimTextOutput("debug")),
+            
             fluidRow(uiOutput("variables")),
             fluidRow(uiOutput("groups")),
             fluidRow(
@@ -118,7 +127,7 @@ ui <- dashboardPage(
             ),
             
             fluidRow(
-                executeSVM("univariate", "svm", "modeltype", "withp", "withoutp"),
+                executeSVM("univariate", "svm", "modeltype", "noneset", "kset", "uset"),
                 consoleOutput("console")
             ),
             
@@ -133,17 +142,7 @@ ui <- dashboardPage(
                     "allfiles"
                 )
             ),
-            
-            fluidRow(
-                box(
-                    status = "primary",
-                    solidHeader = TRUE,
-                    collapsible = TRUE,
-                    title = "Interactive Plots",
-                    width = 6
-                    # plotlyOutput('plot')
-                )
-            )
+            fluidRow(predictUI("regular"))
             
         ),
         tabItem(
@@ -173,8 +172,9 @@ ui <- dashboardPage(
                     "reg_univariate",
                     "reg_svm",
                     "reg_modeltype",
-                    "reg_withp",
-                    "reg_withoutp"
+                    "reg_noneset",
+                    "reg_kset",
+                    "reg_uset"
                 ),
                 consoleOutput("reg_console")
             ),
@@ -189,20 +189,125 @@ ui <- dashboardPage(
                     "reg_report",
                     "reg_allfiles"
                 )
+            )
+        ),
+        tabItem(
+            tabName = "cv",
+            # fluidRow(verbatimTextOutput("reg_debug")),
+            fluidRow(uiOutput("cv_variables")),
+            fluidRow(uiOutput("cv_groups")),
+            fluidRow(
+                uploadFiles("cv_file_data", "cv_file_annotations", "cv_file_node"),
+                checklist(
+                    "cv_upload_check",
+                    "cv_variable_check",
+                    "cv_contrast_check",
+                    "cv_inputdata_check",
+                    "cv_univariate_check",
+                    "cv_svm_check"
+                )
             ),
             
             fluidRow(
-                box(
-                    status = "primary",
-                    solidHeader = TRUE,
-                    collapsible = TRUE,
-                    title = "Interactive Plots",
-                    width = 6
-                    # plotlyOutput('reg_plot')
+                viewData("cv_training", "cv_annotation", "cv_node"),
+                cv_inputConfigurations()
+            ),
+            
+            fluidRow(
+                executeSVM(
+                    "cv_univariate",
+                    "cv_svm",
+                    "cv_modeltype",
+                    "cv_noneset",
+                    "cv_kset",
+                    "cv_uset"
+                ),
+                consoleOutput("cv_console")
+            ),
+            
+            fluidRow(
+                results(
+                    "cv_results",
+                    "cv_select_uni_plot",
+                    "cv_select_svm_plot",
+                    "cv_uni_plots",
+                    "cv_svm_plots",
+                    "cv_report",
+                    "cv_allfiles"
                 )
             )
             
+            # fluidRow(
+            #     box(
+            #         status = "primary",
+            #         solidHeader = TRUE,
+            #         collapsible = TRUE,
+            #         title = "Interactive Plots",
+            #         width = 6
+            #         # plotlyOutput('reg_plot')
+            #     )
+            # )
             
+            
+        ),
+        tabItem(
+            tabName = "cv_regression",
+            # fluidRow(verbatimTextOutput("reg_debug")),
+            fluidRow(uiOutput("cv_reg_variables")),
+            fluidRow(uiOutput("cv_reg_groups")),
+            fluidRow(
+                uploadFiles("cv_reg_file_data", "cv_reg_file_annotations", "cv_reg_file_node"),
+                checklist(
+                    "cv_reg_upload_check",
+                    "cv_reg_variable_check",
+                    "cv_reg_contrast_check",
+                    "cv_reg_inputdata_check",
+                    "cv_reg_univariate_check",
+                    "cv_reg_svm_check"
+                )
+            ),
+
+            fluidRow(
+                viewData("cv_reg_training", "cv_reg_annotation", "cv_reg_node"),
+                cv_reg_inputConfigurations()
+            ),
+
+            fluidRow(
+                executeSVM(
+                    "cv_reg_univariate",
+                    "cv_reg_svm",
+                    "cv_reg_modeltype",
+                    "cv_reg_noneset",
+                    "cv_reg_kset",
+                    "cv_reg_uset"
+                ),
+                consoleOutput("cv_reg_console")
+            ),
+
+            fluidRow(
+                results(
+                    "cv_reg_results",
+                    "cv_reg_select_uni_plot",
+                    "cv_reg_select_svm_plot",
+                    "cv_reg_uni_plots",
+                    "cv_reg_svm_plots",
+                    "cv_reg_report",
+                    "cv_reg_allfiles"
+                )
+            )
+
+            # fluidRow(
+            #     box(
+            #         status = "primary",
+            #         solidHeader = TRUE,
+            #         collapsible = TRUE,
+            #         title = "Interactive Plots",
+            #         width = 6
+            #         # plotlyOutput('reg_plot')
+            #     )
+            # )
+
+
         )
     ))
 )
@@ -213,264 +318,178 @@ ui <- dashboardPage(
 # Define server logic
 server <- function(input, output, session) {
     
+    options(shiny.maxRequestSize=50*1024^2)
     
-    
-    # observe({
-    #     files <- input$files$name
-    #     updateSelectInput(session = session,
-    #                       inputId = "select_file",
-    #                       choices = files)
-
-    # })
-    # 
-    # #updating the upload files checkbox after files have been uploaded
-    # files <- reactive({
-    #     list(input$file_data, input$file_annotations, input$file_node)
-    # })
-    # 
-    # observeEvent(input$files, {
-    #     enable("upload_check")
-    #     updatePrettyCheckbox(session = session,
-    #                          inputId = "upload_check",
-    #                          value = TRUE)
-    # })
-
-    # checking and loading only the mat file
-    # xt <<- ""
-    training <- reactive({
-        req(input$file_data)
-        dater = matrix(list(),
-                       nrow = 1,
-                       ncol = length(input$file_data$name))
-        # for (i in 1:length(input$file_data$name)) {
-            if (tools::file_ext(input$file_data$datapath) == "mat") {
-                xt <<- tools::file_ext(input$file_data$datapath)
-                df <- readMat(input$file_data$datapath)
-                df <- df[[1]]
-                dater[[1, 1]] <- df
-                # return(dater)
-            } else if (tools::file_ext(input$file_data$datapath) == "csv") {
-                xt <<- tools::file_ext(input$file_data$datapath)
-                # inputFile2d <<- TRUE
-                # print("loading data FILE IS 2D!!!!!")
-                df <- read.csv(input$file_data$datapath,
-                               header = TRUE,
-                               sep = ",")
-                dater[[1, 1]] <- df
-                
-                # return(dater)
-            }
-        # }
-        # return(dater)
+    observeEvent(input$file_data, {
+        enable("upload_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "upload_check",
+                             value = TRUE)
+        
     })
+    
 
-    annotations <- reactive({
-        req(xt)
-        if (xt == "csv"){
-            req(input$file_data)
-            print("annotations 2D data!!")
-            dater <- data.frame(training()[2])
-            return(dater)
-        } else {
-            req(input$file_annotations)
-        dater = matrix(list(),
-                       nrow = 1,
-                       ncol = 1)
-        df <- read.csv(input$file_annotations$datapath,
-                       header = TRUE,
-                       sep = ",")
-        dater[[1, 1]] <- df
-        return(dater)
+    # loading data file .mat/.csv
+    trainingData <- reactive({
+        req(input$file_data)
+        xt <- tools::file_ext(input$file_data$datapath)
+        if (xt == "mat") {
+            df <- readMat(input$file_data$datapath)
+            df <- df[[1]]
+            df <- df[, , 1]
+        } else if (xt == "csv") {
+            df <- read.csv(input$file_data$datapath,
+                           header = TRUE,
+                           sep = ",")
+            df
         }
         
     })
+    
+    # getting extension used to determine file input type
+    xt <- reactive({
+        tools::file_ext(input$file_data$datapath)
+    })
 
-    node <- reactive({
-        req(xt)
-        if(xt == "csv"){
-            print("node 2D data!!!!")
-        } else {
-        # req(input$file_node)
-        dater = matrix(list(),
-                       nrow = 1,
-                       ncol = 1)
-        df <- read.csv(input$file_node$datapath,
-                       header = TRUE,
-                       sep = ",")
-        dater[[1, 1]] <- df
-        return(dater)
+    # getting annotations
+    annotationsData <- reactive({
+        req(input$file_data)
+        xt <<- tools::file_ext(input$file_data$datapath)
+        if (xt == "csv") {
+            req(input$file_data)
+            print("annotations 2D data!!")
+            df <- matrix(trainingData()[, input$training_columns_selected])
+        } else if (xt == "mat") {
+            req(input$file_annotations)
+            df <- read.csv(input$file_annotations$datapath,
+                           header = TRUE,
+                           sep = ",",
+                           fileEncoding = "UTF-8-BOM")
         }
     })
+    
+
+    nodeData <- reactive({
+        req(input$file_data)
+        xt <<- tools::file_ext(input$file_data$datapath)
+        if (xt == "csv") {
+            print("node 2D data!!!!")
+        } else if (xt == "mat") {
+            req(input$file_node)
+            df <- read.csv(input$file_node$datapath,
+                           header = TRUE,
+                           sep = ",",
+                           fileEncoding = "UTF-8-BOM")
+        }
+    })
+    
+    
+    output$training <- DT::renderDataTable({
+        req(input$file_data)
+        datatable(
+            trainingData(),
+            caption = "If your data is a 2D CSV, click on the column with annotations",
+            options = list(
+                autoWidth = TRUE,
+                lengthChange = FALSE,
+                scrollY = TRUE,
+                searching = FALSE,
+                scrollX = TRUE,
+                paging = TRUE,
+                pageLength = 10
+            ),
+            selection = list(target = 'column')
+        )
+        
+    })
+    
+    output$annotation <- DT::renderDataTable({
+        req(input$file_data)
+        datatable(
+            annotationsData(),
+            options = list(
+                autowidth = TRUE,
+                pageLength = 10,
+                lengthChange = FALSE,
+                scrollX = TRUE,
+                scrollY = TRUE,
+                searching = FALSE
+            )
+        )
+        
+    })
+    
+    output$node <- DT::renderDataTable({
+        req(input$file_data)
+        xt <<- tools::file_ext(input$file_data$datapath)
+        if(xt == "csv"){
+
+        } else if (xt == "mat") {
+            datatable(
+                nodeData(),
+                options = list(
+                    autowidth = TRUE,
+                    pageLength = 10,
+                    lengthChange = FALSE,
+                    scrollX = TRUE,
+                    scrollY = TRUE,
+                    searching = FALSE
+                )
+            )
+        }
+    })
+    
 
 
     # rendering the drag and drop with variable names
-
+    output$variables_csv <- DT::renderDataTable({
+        d <- trainingData()
+        
+        labs <- c(colnames(d))
+        datatable(
+            matrix(labs),
+            options = list(
+                autowidth = TRUE,
+                pageLength = 10,
+                lengthChange = FALSE,
+                searching = FALSE
+            )
+        )
+        
+    })
+    
+    output$samplevar <- renderText({
+        d <- trainingData()
+        paste("Selected Sample Variable: ", colnames(d)[input$variables_csv_rows_selected[1]])
+    })
+    output$groupvar <- renderText({
+        d <- trainingData()
+        paste("Selected Group Variable: ", colnames(d)[input$variables_csv_rows_selected[2]])
+    })
     output$variables <- renderUI({
-        req(input$file_data)
+        req(input$confirmcontrast)
         xt <<- tools::file_ext(input$file_data$datapath)
         print(xt)
         if(xt == "csv"){
-
-            print("file is 2d")
-
-            labs <- c(colnames(training()[1:2]))
-                    print("FILE IS 2D!!!!!!!!!!!!!")
-
-                    useShinyjs()
-                    tagList(
-                        box(
-                            title = "File Variables",
-                            status = "primary",
-                            width = 12,
-                            collapsible = TRUE,
-                            solidHeader = TRUE,
-
-                            div ( style = 'overflow-y:scroll; max-height: 382px;',
-                            fluidRow(
-                                class = "panel-body",
-                                column(
-                                    width = 4,
-                                    tags$div(
-                                        class = "panel panel-default",
-                                        tags$div(class = "panel-heading",
-                                                 "File Variables"),
-                                        tags$div(class = "panel-body av_vars_body",
-                                                 id = "availablevars",
-                                                 icon_list(labs)),
-                                        tags$style(HTML('
-                                        '))
-                                    )
-                                ),
-                                column(
-                                    width = 4,
-                                    tags$div(
-                                        class = "panel panel-default",
-                                        tags$div(class = "panel-heading",
-                                                 "Sample"),
-                                        tags$div(class = "panel-body",
-                                                 id = "chosen_sample")
-                                    ),
-                                    tags$div(
-                                        class = "panel panel-default",
-                                        tags$div(class = "panel-heading",
-                                                 "Group"),
-                                        tags$div(class = "panel-body",
-                                                 id = "chosen_group")
-                                    )
-                                ),
-                                # column(
-                                #     width = 4,
-                                #     tags$div(
-                                #         class = "panel panel-default",
-                                #         tags$div(class = "panel-heading",
-                                #                  "Node ID"),
-                                #         tags$div(class = "panel-body",
-                                #                  id = "chosen_node")
-                                #     ),
-                                #     tags$div(
-                                #         class = "panel panel-default",
-                                #         tags$div(class = "panel-heading",
-                                #                  "Region"),
-                                #         tags$div(class = "panel-body",
-                                #                  id = "chosen_region")
-                                #     )
-                                # ),
-                                #################### sortable code for drag and drop
-                                sortable_js(
-                                    "availablevars",
-                                    options = sortable_options(
-                                        group = list(
-                                            pull = TRUE,
-                                            name = "allvars",
-                                            put = TRUE
-                                        ),
-                                        onSort = sortable_js_capture_input("sort_vars")
-                                    )
-
-                                ),
-                                sortable_js(
-                                    "chosen_sample",
-                                    options = sortable_options(
-                                        group = list(
-                                            group = "allvars",
-                                            put = htmlwidgets::JS(
-                                                'function (to) { return to.el.children.length < 1; }'
-                                            ),
-                                            pull = htmlwidgets::JS(
-                                                'function (to) { document.getElementById("chosen_sample").style.backgroundColor = "white"; }'
-                                            )
-                                        ),
-                                        swapClass = "sortable-swap-highlight",
-                                        onSort = sortable_js_capture_input("chosen_sample")
-                                    )
-                                ),
-                                sortable_js(
-                                    "chosen_group",
-                                    options = sortable_options(
-                                        group = list(
-                                            group = "allvars",
-                                            put = htmlwidgets::JS(
-                                                'function (to) { return to.el.children.length < 1; }'
-                                            ),
-                                            pull = htmlwidgets::JS(
-                                                'function (to) { document.getElementById("chosen_group").style.backgroundColor = "white"; }'
-                                            )
-                                        ),
-                                        swapClass = "sortable-swap-highlight",
-                                        onSort = sortable_js_capture_input("chosen_group")
-                                        # onMove = htmlwidgets::JS('document.getElementById("chosen_group").style.backgroundColor = "lightblue";')
-                                    )
-                                )
-                                # sortable_js(
-                                #     "chosen_node",
-                                #     options = sortable_options(
-                                #         group = list(
-                                #             group = "allvars",
-                                #             put = htmlwidgets::JS(
-                                #                 'function (to) { return to.el.children.length < 1; }'
-                                #             ),
-                                #             pull = htmlwidgets::JS(
-                                #                 'function (to) { document.getElementById("chosen_node").style.backgroundColor = "white"; }'
-                                #             )
-                                #         ),
-                                #         swapClass = "sortable-swap-highlight",
-                                #         onSort = sortable_js_capture_input("chosen_node")
-                                #     )
-                                # ),
-                                # sortable_js(
-                                #     "chosen_region",
-                                #     options = sortable_options(
-                                #         group = list(
-                                #             group = "allvars",
-                                #             put = htmlwidgets::JS(
-                                #                 'function (to) { return to.el.children.length < 1; }'
-                                #             ),
-                                #             pull = htmlwidgets::JS(
-                                #                 'function (to) { document.getElementById("chosen_region").style.backgroundColor = "white"; }'
-                                #             )
-                                #         ),
-                                #         swapClass = "sortable-swap-highlight",
-                                #         onSort = sortable_js_capture_input("chosen_region")
-                                #     )
-                                # )
-                            ),
-                            actionButton(inputId = "choose_vars",
-                                         label = "Confirm Variables"),
-                            # tags$head(
-                            #     tags$style(
-                            #         "#box-body{overflow-y:scroll; max-height: 250px; background: ghostwhite;}"
-                            #     )
-                            # )
-                        )
-                        )
-                    )
+                    
+            box(
+                title = "File Variables from column names",
+                status = "primary",
+                width = 12,
+                collapsible = TRUE,
+                solidHeader = TRUE,
+                dataTableOutput("variables_csv"),
+                verbatimTextOutput("samplevar"),
+                verbatimTextOutput("groupvar"),
+                actionButton(inputId = "choose_vars", label = "Confirm Variables")
+            )
 
         } else if(xt == "mat"){
             print("file is not 2d")
 
             req(input$file_annotations, input$file_node)
                     labs <-
-                        c(colnames(annotations()[[1, 1]]), colnames(node()[[1, 1]]))
+                        c(colnames(annotationsData()), colnames(nodeData()))
 
                     useShinyjs()
                     tagList(
@@ -509,7 +528,7 @@ server <- function(input, output, session) {
                                     tags$div(
                                         class = "panel panel-default",
                                         tags$div(class = "panel-heading",
-                                                 "Group"),
+                                                 "Target"),
                                         tags$div(class = "panel-body",
                                                  id = "chosen_group")
                                     )
@@ -603,8 +622,8 @@ server <- function(input, output, session) {
                             actionButton(inputId = "choose_vars",
                                          label = "Confirm Variables")
                         )
-                        
-                    
+
+
                     )
 
         } else {
@@ -618,13 +637,23 @@ server <- function(input, output, session) {
         req(input$file_data)
         xt <<- tools::file_ext(input$file_data$datapath)
         if(xt == "csv"){
-             print("contrast !! file 2d!")
+            req(input$training_columns_selected)
+            print("contrast !! file 2d!")
             
-            groups <- data.frame(annotations())
+            d <- read.csv(input$file_data$datapath,
+                          header = TRUE,
+                          sep = ",")
+            d <- matrix(d[, input$training_columns_selected])
+            # print(d)
+            
+            groups <- data.frame(d)
             groups <- count(groups$group)
-            groupnames <- unique(groups$x)
+            groupnames <- unique(d)
             groupcount <- groups$freq
             numgroups <- length(groups)
+            print("group names")
+            print(groupnames)
+            print(unique(d))
             useShinyjs()
             tagList(
                 box(
@@ -777,7 +806,7 @@ server <- function(input, output, session) {
             )
         }else{
             req(input$file_annotations, input$file_node)
-        groups <- data.frame(annotations()[[1, 1]])
+        groups <- data.frame(annotationsData())
         groups <- count(groups$group)
         groupnames <- unique(groups$x)
         groupcount <- groups$freq
@@ -1125,54 +1154,7 @@ server <- function(input, output, session) {
     output$debug <-
         renderText(paste0("Debug: ", input$contrast_group1[2]))
 
-    output$training <- DT::renderDataTable({
-        datatable(
-            # training()[[1, 1]][, , 1],
-            training()[,1:10,1], ######### change this after
-            
-            options = list(
-                autoWidth = TRUE,
-                lengthChange = FALSE,
-                scrollX = TRUE,
-                scrollY = TRUE,
-                searching = FALSE
-            )
-        ) %>%
-            formatRound(columns = c(2:length(training())), 3)
-    })
-
-    output$annotation <- DT::renderDataTable({
-        datatable(
-            if(xt == "csv"){
-                annotations()
-            } else {
-                annotations()[[1, 1]]
-            },
-            options = list(
-                autowidth = TRUE,
-                pageLength = 10,
-                lengthChange = FALSE,
-                searching = FALSE
-            )
-        )
-    })
-
-    output$node <- DT::renderDataTable({
-        if(xt == "csv"){
-
-        } else {
-        datatable(
-            node()[[1, 1]],
-            options = list(
-                autowidth = TRUE,
-                pageLength = 10,
-                lengthChange = FALSE,
-                searching = FALSE
-            )
-        )
-        }
-    })
-
+    
     contrast <- reactiveValues()
 
     observeEvent(input$confirmcontrast, {
@@ -1208,6 +1190,7 @@ server <- function(input, output, session) {
             contrast$groups <- output
 
         }
+        
         enable("contrast_check")
         updatePrettyCheckbox(session = session,
                              inputId = "contrast_check",
@@ -1217,7 +1200,12 @@ server <- function(input, output, session) {
 
 
     observeEvent(input$choose_vars, {
-        varNames <- c(input$chosen_sample, input$chosen_group, input$chosen_node, input$chosen_region)
+        if(xt == "csv"){
+            varNames <- c(colnames(trainingData())[input$variables_csv_rows_selected[1]], colnames(trainingData())[input$variables_csv_rows_selected[2]])
+        } else if (xt == "mat") {
+            varNames <- c(input$chosen_sample, input$chosen_group, input$chosen_node, input$chosen_region)
+        }
+        
         # varNames <- names(variableNames)
         print(varNames)
         vars = "You chose: "
@@ -1251,9 +1239,16 @@ server <- function(input, output, session) {
         matfilenoext <-
             tools::file_path_sans_ext(input$file_data$name)
         dir.create(file.path(tempdir(), '/OUTPUT'), showWarnings = FALSE)
-        annotfile <- input$file_annotations$datapath
-        samplesvar <- input$chosen_sample
-        groupvar <- input$chosen_group
+        
+        if (xt == "csv") {
+            samplesvar <- colnames(trainingData())[input$variables_csv_rows_selected[1]]
+            groupvar <- colnames(trainingData())[input$variables_csv_rows_selected[2]]
+        } else if (xt == "mat") {
+            annotfile <- input$file_annotations$datapath
+            samplesvar <- input$chosen_sample
+            groupvar <- input$chosen_group
+        }
+        
         outdir <-
             paste0(tempdir(), '/OUTPUT')
         
@@ -1297,16 +1292,6 @@ server <- function(input, output, session) {
         raw_sample_dfm$raw_sample_dfm_wo_uni <- proc_data[2]
         removeModal()
 
-
-        insertUI(
-            selector = "#configfilebutton",
-            where = "afterEnd",
-            ui = fileInput(
-                inputId = "up_configs",
-                label = "Upload Config File",
-                multiple = FALSE
-            )
-        )
         enable("inputdata_check")
         updatePrettyCheckbox(session = session,
                              inputId = "inputdata_check",
@@ -1382,45 +1367,73 @@ server <- function(input, output, session) {
             inputArgs[61] <- node_id_var
             inputArgs[62] <- region_name_var
         }
-
-        withConsoleRedirect("console", {
-            if(xt == "mat"){
-                univariate(inputArgs)
-            } else if (xt == "csv") {
-                print("she's 2D!")
-                univariate_2D(inputArgs)
-            }
-            
+        
+        show_modal_spinner(text = "Processing...")
+        tryCatch({
+            withConsoleRedirect("console", {
+                if (xt == "mat") {
+                    univariate(inputArgs)
+                } else if (xt == "csv") {
+                    suppressWarnings(univariate_2D(inputArgs))
+                }
+                
+            })
+        },
+        error = function(e){
+            withConsoleRedirect("console", {
+                cat("No significant features detected, univariate feature reduction cannot be performed. 
+                    If running the SVM classifier, choose the option: Do not incorporate univariate prior knowledge during SVM analysis. 
+                    Note: this will take significantly longer to classify.")
+            })
         })
-
+        
+        remove_modal_spinner()
+        # setwd(tempdir())
+        
         enable("univariate_check")
         updatePrettyCheckbox(session = session,
                              inputId = "univariate_check",
                              value = TRUE)
 
         # converting PDF results to PNGs to display in renderImage()
+        if (file.exists(file.path(tempdir(), 'OUTPUT', 'UNIVARIATE', 'Rplots.pdf'))){
+            print("Rplots.pdf exists!, deleting now")
+        } else {
+            print("Rplots.pdf does not exist!")
+        }
         pdf.list <-
             list.files(path = file.path(tempdir(), 'OUTPUT', 'UNIVARIATE'),
-                       pattern = ".pdf$", full.names=TRUE)
+                       pattern = ".pdf$", full.names = TRUE)
+
+        lapply(
+            pdf.list,
+            FUN = function(files) {
+                if (basename(files) == "Rplots.pdf") {
+                    NULL
+                } else {
+                    pdf_convert(
+                        files,
+                        format = "png",
+                        filenames = paste0(
+                            dirname(files),
+                            "/PNGFILES/" ,
+                            tools::file_path_sans_ext(basename(files)),
+                            ".png"
+                        )
+                    )
+                }
+                
+            }
+        )
         
-        pdf_convert(pdf.list[1], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[1]), ".png"))
-        pdf_convert(pdf.list[2], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[2]), ".png"))
-        pdf_convert(pdf.list[3], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[3]), ".png"))
-        pdf_convert(pdf.list[4], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[4]), ".png"))
-        pdf_convert(pdf.list[5], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[5]), ".png"))
-        pdf_convert(pdf.list[6], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[6]), ".png"))
-        pdf_convert(pdf.list[7], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[7]), ".png"))
-        # lapply(1:length(pdf.list), function(i){
-        #     pdf_convert(pdf.list[i], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[i]), ".png"))
-        # })
-        
-        #updating the Select Input with the png filenames
+        # #updating the Select Input with the png filenames
         filenames <-
             list.files(
-                path = file.path(tempdir(), 'OUTPUT', 'UNIVARIATE'),
+                path = normalizePath(file.path(tempdir(), 'OUTPUT', 'UNIVARIATE', 'PNGFILES')),
                 pattern = ".png$",
                 full.names = FALSE
             )
+        print(filenames)
         updateSelectInput(session = session,
                           inputId = "select_uni_plot",
                           choices = filenames)
@@ -1437,8 +1450,16 @@ server <- function(input, output, session) {
 
         dat_file <- switch(
             input$modeltype,
-            withp = paste0(tempdir(), "/OUTPUT/UNIVARIATE/", matfilenoext, "_ml.csv"),
-            withoutp = paste0(tempdir(), "/OUTPUT/", matfilenoext, "_2D_wo_uni.csv")
+            noneset = paste0(tempdir(), "/OUTPUT/", matfilenoext, "_2D_wo_uni.csv"),
+            kset = paste0(tempdir(), "/OUTPUT/UNIVARIATE/", matfilenoext, "_ml.csv"),
+            uset = paste0(tempdir(), "/OUTPUT/", matfilenoext, "_2D_wo_uni.csv")
+        )
+        
+        cvuni <- switch(
+            input$modeltype,
+            noneset = FALSE,
+            kset = FALSE,
+            uset = TRUE
         )
 
         do.call(file.remove, list(list.files(
@@ -1457,9 +1478,15 @@ server <- function(input, output, session) {
         nodefile <- input$file_node$datapath
         # configs <- uploaded_configs()[2][[1]]
         contrast <- contrast$groups[1]
-        psetting <- 3
-        cores <- 2
-        cvuni <- FALSE
+        psetting = FALSE
+        if (isTruthy(input$cores)){
+            paste0("parallel computing", input$cores)
+            psetting <- TRUE
+            cores <- input$cores
+        } else {
+            print("no parallel computing")
+        }
+        
 
         # getting values from input fields into an args[] fromat
         inputArgs <- ml_svmConfigs(inputConfigs())
@@ -1471,56 +1498,59 @@ server <- function(input, output, session) {
         inputArgs[62] <- cvuni
         inputArgs[64] <- contrast
         
+        show_modal_spinner(text = "Running classifier...")
         withConsoleRedirect("console", {
             ml_svm(inputArgs)
-            
         })
-
         
+        print("PLSDA ANALYSIS")
+        plsdainputArgs <- plsdaConfigs(inputConfigs())
+        plsdainputArgs[6] <- paste0(outdir, '/', matfilenoext, '_final_svm_model.Rdata')
+        plsdainputArgs[7] <- matfilenoext
+        plsdainputArgs[8] <- outdir
+        plsdainputArgs[9] <- psetting
+        plsdainputArgs[10] <- cores
+        
+        withConsoleRedirect("console", {
+            plsda_val_svm(plsdainputArgs)
+        })
+        
+        remove_modal_spinner()
 
         # converting PDF results to PNGs to display in renderImage()
+        if (file.exists(file.path(tempdir(), 'OUTPUT', 'ML_SVM', 'Rplots.pdf'))){
+            print("Rplots.pdf exists!, deleting now")
+        } else {
+            print("Rplots.pdf does not exist!")
+        }
         pdf.list <-
             list.files(path = file.path(tempdir(), 'OUTPUT', 'ML_SVM'),
-                       pattern = ".pdf$")
-
-        pdf_convert(pdf.list[1], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[1]), ".png"))
-        pdf_convert(pdf.list[2], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[2]), ".png"))
-        pdf_convert(pdf.list[3], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[3]), ".png"))
-        pdf_convert(pdf.list[4], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[4]), ".png"))
-        pdf_convert(pdf.list[5], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[5]), ".png"))
-        pdf_convert(pdf.list[6], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[6]), ".png"))
-        pdf_convert(pdf.list[7], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[7]), ".png"))
-        pdf_convert(pdf.list[8], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[8]), ".png"))
-        pdf_convert(pdf.list[9], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[9]), ".png"))
-        pdf_convert(pdf.list[10], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[10]), ".png"))
-        pdf_convert(pdf.list[11], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[11]), ".png"))
-        pdf_convert(pdf.list[12], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[12]), ".png"))
-        pdf_convert(pdf.list[13], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[13]), ".png"))
-        pdf_convert(pdf.list[14], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[14]), ".png"))
-        pdf_convert(pdf.list[15], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[15]), ".png"))
-        pdf_convert(pdf.list[16], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[16]), ".png"))
-        pdf_convert(pdf.list[17], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[17]), ".png"))
-        pdf_convert(pdf.list[18], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[18]), ".png"))
-        # lapply(
-        #     pdf.list,
-        #     FUN = function(files) {
-        #         pdf_convert(
-        #             files,
-        #             format = "png",
-        #             filenames = paste0(
-        #                 sep = "",
-        #                 "PNGFILES/" ,
-        #                 tools::file_path_sans_ext(files),
-        #                 ".png"
-        #             )
-        #         )
-        #     }
-        # )
+                       pattern = ".pdf$", full.names = TRUE)
+        lapply(
+            pdf.list,
+            FUN = function(files) {
+                if (basename(files) == "Rplots.pdf") {
+                    NULL
+                } else {
+                    pdf_convert(
+                        files,
+                        format = "png",
+                        filenames = paste0(
+                            dirname(files),
+                            "/PNGFILES/" ,
+                            tools::file_path_sans_ext(basename(files)),
+                            ".png"
+                        )
+                    )
+                }
+                
+            }
+        )
 
         #updating the Select Input with the png filenames
         files <-
             list.files(
-                path = file.path(tempdir(), 'OUTPUT', 'ML_SVM'),
+                path = file.path(tempdir(), 'OUTPUT', 'ML_SVM', 'PNGFILES'),
                 pattern = ".png$",
                 full.names = FALSE
             )
@@ -1540,17 +1570,19 @@ server <- function(input, output, session) {
     # viewing plots
     output$uni_plots <- renderImage({
         req(input$univariate)
-        list(
-            src = file.path(
+        setwd(tempdir())
+        suppressWarnings(list(
+            src = normalizePath(file.path(
                 tempdir(),
                 'OUTPUT',
                 'UNIVARIATE',
+                'PNGFILES',
                 input$select_uni_plot
-            ),
+            )),
             alt = "Univariate plots",
             width = 400,
             height = 400
-        )
+        ))
 
     }, deleteFile = FALSE)
 
@@ -1561,6 +1593,7 @@ server <- function(input, output, session) {
                 tempdir(),
                 'OUTPUT',
                 'ML_SVM',
+                'PNGFILES',
                 input$select_svm_plot
             ),
             alt = "SVM plots",
@@ -1577,11 +1610,12 @@ server <- function(input, output, session) {
             paste("report-", Sys.Date(), ".pdf", sep="")
         },
         content = function(file) {
-            tempReport <- normalizePath(file.path(tempdir(), 'results.Rmd'))
-            file.copy(file.path(getwd(), 'results.Rmd'), tempReport, overwrite = TRUE)
-            rmarkdown::render(input = tempReport)
+            setwd('/srv/shiny-server/')
+            tempReport <- file.path(tempdir(), 'results.Rmd')
+            file.copy(file.path('srv', 'shiny-server', 'results.Rmd'), tempReport, overwrite = TRUE)
+            rmarkdown::render(input = 'results.Rmd')
             # tinytex::pdflatex('results.tex')
-            file.copy(file.path(tempdir(), 'results.pdf'), file)
+            file.copy(file.path('results.pdf'), file)
         }
         
     )
@@ -1598,7 +1632,7 @@ server <- function(input, output, session) {
         }
     )
     
-    
+    predictServer("regular")
 
 
     ################################### Regression #####################################
@@ -1613,49 +1647,72 @@ server <- function(input, output, session) {
         dater = matrix(list(),
                        nrow = 1,
                        ncol = length(input$reg_file_data$name))
-        # for (i in 1:length(input$file_data$name)) {
         if (reg_xt == "mat") {
-            
             df <- readMat(input$reg_file_data$datapath)
             df <- df[[1]]
             dater[[1, 1]] <- df
+            # return(dater)
         } else if (reg_xt == "csv") {
             df <- read.csv(input$reg_file_data$datapath,
                            header = TRUE,
                            sep = ",")
+            # return(df)
             dater[[1, 1]] <- df
         }
-        # }
         return(dater)
     })
 
     reg_annotations <- reactive({
-        req(input$reg_file_annotations)
-        dater = matrix(list(),
-                       nrow = 1,
-                       ncol = 1)
-        df <- read.csv(input$reg_file_annotations$datapath,
-                       header = TRUE,
-                       sep = ",")
-        dater[[1, 1]] <- df
-        return(dater)
+        reg_xt <<- tools::file_ext(input$reg_file_data$datapath)
+        if (reg_xt == "csv"){
+            req(input$reg_file_data)
+            print("annotations 2D data!!")
+            dater <- data.frame(training()[2])
+            return(dater)
+        }
+        else {
+            req(input$reg_file_annotations)
+            dater = matrix(list(),
+                           nrow = 1,
+                           ncol = 1)
+            df <- read.csv(input$reg_file_annotations$datapath,
+                           header = TRUE,
+                           sep = ",")
+            dater[[1, 1]] <- df
+            return(dater)
+        }
+        
     })
 
     reg_node <- reactive({
-        req(input$reg_file_node)
-        dater = matrix(list(),
-                       nrow = 1,
-                       ncol = 1)
-        df <- read.csv(input$reg_file_node$datapath,
-                       header = TRUE,
-                       sep = ",")
-        dater[[1, 1]] <- df
-        return(dater)
+        req(reg_xt)
+        if(reg_xt == "csv"){
+            print("node 2D data!!")
+        }
+        else{
+            req(input$reg_file_node)
+            dater = matrix(list(),
+                           nrow = 1,
+                           ncol = 1)
+            df <- read.csv(input$reg_file_node$datapath,
+                           header = TRUE,
+                           sep = ",")
+            dater[[1, 1]] <- df
+            return(dater)
+        }
+        
     })
 
     output$reg_training <- DT::renderDataTable({
+        reg_xt <<- tools::file_ext(input$reg_file_data$datapath)
+        req(input$reg_file_data)
+        if (reg_xt == "csv"){
+            d <- reg_training()[[1, 1]]
+        } else if (reg_xt == "mat"){
+            d <- reg_training()[[1, 1]][, , 1]
+        }
         datatable(
-            reg_training()[[1, 1]][, , 1],
+            d,
             colnames = NULL,
             options = list(
                 autoWidth = TRUE,
@@ -1663,14 +1720,20 @@ server <- function(input, output, session) {
                 scrollX = TRUE,
                 scrollY = TRUE,
                 searching = FALSE
-            )
-        ) %>%
-            formatRound(c(1:90), 3)
+            ),
+            selection = list(target = 'column')
+        ) 
+        # %>% formatRound(c(1:90), 3)
     })
 
     output$reg_annotation <- DT::renderDataTable({
+        req(reg_xt)
         datatable(
-            reg_annotations()[[1, 1]],
+            if(reg_xt == "csv"){
+                reg_annotations()
+            } else {
+                reg_annotations()[[1, 1]]
+            },
             options = list(
                 autowidth = TRUE,
                 pageLength = 10,
@@ -1681,8 +1744,13 @@ server <- function(input, output, session) {
     })
 
     output$reg_node <- DT::renderDataTable({
+        req(reg_xt)
         datatable(
-            reg_node()[[1, 1]],
+            if(reg_xt == "csv"){
+                
+            } else {
+                reg_node()[[1, 1]]
+            },
             options = list(
                 autowidth = TRUE,
                 pageLength = 10,
@@ -1693,11 +1761,53 @@ server <- function(input, output, session) {
     })
 
     # rendering the drag and drop with variable names
+    
+    output$reg_variables_csv <- DT::renderDataTable({
+        d <- reg_training()[[1, 1]]
+        
+        labs <- c(colnames(d))
+        datatable(
+            matrix(labs),
+            options = list(
+                autowidth = TRUE,
+                pageLength = 10,
+                lengthChange = FALSE,
+                searching = FALSE
+            )
+        )
+        
+    })
+    
+    output$reg_samplevar <- renderText({
+        d <- reg_training()[[1, 1]]
+        paste("Selected Sample Variable: ", colnames(d)[input$reg_variables_csv_rows_selected[1]])
+    })
+    output$reg_groupvar <- renderText({
+        d <- reg_training()[[1, 1]]
+        paste("Selected Group Variable: ", colnames(d)[input$reg_variables_csv_rows_selected[2]])
+    })
+    
     output$reg_variables <- renderUI({
+        req(input$reg_file_data)
+        reg_xt <<- tools::file_ext(input$reg_file_data$datapath)
+        if (reg_xt == "csv"){
+            
+            box(
+                title = "File Variables from column names",
+                status = "primary",
+                width = 12,
+                collapsible = TRUE,
+                solidHeader = TRUE,
+                dataTableOutput("reg_variables_csv"),
+                verbatimTextOutput("reg_samplevar"),
+                verbatimTextOutput("reg_groupvar"),
+                actionButton(inputId = "reg_choose_vars", label = "Confirm Variables")
+            )
+        } else if(reg_xt == "mat") {
         req(input$reg_file_annotations, input$reg_file_node)
         labs <-
             c(colnames(reg_annotations()[[1, 1]]), colnames(reg_node()[[1, 1]]))
-
+        print(labs)
         useShinyjs()
         tagList(
             box(
@@ -1734,7 +1844,7 @@ server <- function(input, output, session) {
                         tags$div(
                             class = "panel panel-default",
                             tags$div(class = "panel-heading",
-                                     "Group"),
+                                     "Target"),
                             tags$div(class = "panel-body",
                                      id = "reg_chosen_group")
                         ),
@@ -1773,7 +1883,7 @@ server <- function(input, output, session) {
                         "reg_chosen_sample",
                         options = sortable_options(
                             group = list(
-                                group = "allvars",
+                                group = "reg_allvars",
                                 put = htmlwidgets::JS(
                                     'function (to) { return to.el.children.length < 1; }'
                                 ),
@@ -1798,7 +1908,7 @@ server <- function(input, output, session) {
                                 )
                             ),
                             swapClass = "sortable-swap-highlight",
-                            onSort = sortable_js_capture_input("reg_chosen_group"),
+                            onSort = sortable_js_capture_input("reg_chosen_group")
                             # onMove = htmlwidgets::JS('document.getElementById("chosen_group").style.backgroundColor = "lightblue";')
                         )
                     ),
@@ -1839,213 +1949,22 @@ server <- function(input, output, session) {
                              label = "Confirm Variables")
             )
         )
-    })
-
-    output$reg_groups <- renderUI({
-        req(input$reg_file_annotations, input$reg_file_node)
-        groups <- data.frame(reg_annotations()[[1, 1]])
-        groups <- count(groups$group)
-        groupnames <- unique(groups$x)
-        groupcount <- groups$freq
-        numgroups <- length(groups)
-        useShinyjs()
-        tagList(
-            box(
-                title = "Contrast variables",
-                status = "primary",
-                width = 12,
-                collapsible = TRUE,
-                solidHeader = TRUE,
-                fluidRow(
-                    class = "panel-body",
-                    column(
-                        width = 3,
-                        tags$div(
-                            class = "panel panel-default",
-                            tags$div(class = "panel-heading",
-                                     "Group Variables"),
-                            tags$div(
-                                class = "panel-body",
-                                id = "reg_availablegroups",
-                                icon_list(groupnames)
-                            ),
-                            tags$style(HTML('
-                                '))
-                        )
-                    ),
-                    column(
-                        width = 3,
-                        tags$div(
-                            id = "reg_contrastgroup1",
-                            class = "panel panel-default contrast1",
-                            tags$div(class = "panel-heading",
-                                     "Group 1"),
-                            tags$div(class = "panel-body",
-                                     id = "reg_contrast1"),
-                        )
-                    ),
-                    column(width = 1,
-                           tags$div(class = "h1",
-                                    "VS.")),
-                    column(
-                        width = 3,
-                        tags$div(
-                            class = "panel panel-default",
-                            tags$div(class = "panel-heading",
-                                     "Group 2"),
-                            tags$div(class = "panel-body",
-                                     id = "reg_contrast2")
-                        )
-                    ),
-
-                    column(
-                        width = 2,
-                        tags$div(
-                            class = "panel panel-default",
-                            tags$div(class = "panel-heading",
-                                     icon("trash"),
-                                     "Bin item"),
-                            tags$div(class = "panel-body",
-                                     id = "reg_trashbin")
-                        )
-                    )
-                ),
-                sortable_js(
-                    "reg_availablegroups",
-                    options = sortable_options(
-                        group = list(
-                            pull = "clone",
-                            name = "reg_allsorts",
-                            put = FALSE
-                        ),
-                        onSort = sortable_js_capture_input("reg_sort_vars")
-                    )
-                ),
-                sortable_js(
-                    "reg_contrast1",
-                    options = sortable_options(
-                        group = list(
-                            group = "reg_allsorts",
-                            put = TRUE,
-                            pull = TRUE
-                        ),
-                        swapClass = "sortable-swap-highlight",
-                        onSort = sortable_js_capture_input("reg_contrast_group1")
-                        # onSort = htmlwidgets::JS('function (to) { var count = reg_contrast1.children.length; console.log(count);  var c = reg_contrast1.children;
-                        #                          var colors = ["yellow", "indianred", "steelblue", "green", "magenta"]
-                        #
-                        #                          if (count >= 1){
-                        #                          for (i = 0; i < count; i++){
-                        #                          if (i%5 == 0) {
-                        #                          var j = 0;
-                        #                          }
-                        #                          var color = colors[j]
-                        #                          c[i].style.backgroundColor = color;
-                        #                          j += 1;
-                        #                          var text = c[i].innerText.match(/[a-zA-Z]+/g);
-                        #                          c[i].innerText = i.toString().concat(". ", text);
-                        #                          c[i].style.fontWeight = "bold";
-                        #                          }
-                        #                          console.log("yeeeeeehehehrerhq;lrehq;werh");
-                        #
-                        #                          }}')
-                    )
-
-                ),
-                sortable_js(
-                    "reg_contrast2",
-                    options = sortable_options(
-                        group = list(
-                            group = "reg_allsorts",
-                            put = TRUE,
-                            pull = TRUE
-                        ),
-                        swapClass = "sortable-swap-highlight",
-                        onSort = sortable_js_capture_input("reg_contrast_group2")
-                        # onSort = htmlwidgets::JS('function (to) { var count = reg_contrast2.children.length; console.log(count);  var c = reg_contrast2.children;
-                        #                          var colors = ["yellow", "indianred", "steelblue", "green", "magenta"]
-                        #
-                        #                          if (count >= 1){
-                        #                          for (i = 0; i < count; i++){
-                        #                          if (i%5 == 0) {
-                        #                          var j = 0;
-                        #                          }
-                        #                          var color = colors[j]
-                        #                          c[i].style.backgroundColor = color;
-                        #                          j += 1;
-                        #                          var text = c[i].innerText.match(/[a-zA-Z]+/g);
-                        #                          c[i].innerText = i.toString().concat(". ", text);
-                        #                          c[i].style.fontWeight = "bold";
-                        #                          }
-                        #                          console.log("yeeeeeehehehrerhq;lrehq;werh");
-                        #
-                        #                          }}')
-                    )
-
-                ),
-                sortable_js(
-                    "reg_trashbin",
-                    options = sortable_options(
-                        group = list(
-                            group = "reg_allsorts",
-                            put = TRUE,
-                            pull = TRUE
-                        ),
-                        onAdd = htmlwidgets::JS("function (evt) { this.el.removeChild(evt.item); }")
-                    )
-                ),
-                actionButton(inputId = "reg_confirmcontrast", label = "Confirm")
-            )
-        )
-
-
-    })
-
-    reg_contrast <- reactiveValues()
-
-    observeEvent(input$reg_confirmcontrast, {
-        #check that they're the same length
-        contrast1 <- input$reg_contrast_group1
-        contrast2 <- input$reg_contrast_group2
-        output <- 0
-        if (length(contrast1) != length(contrast2)) {
-            shinyalert(
-                title = "Unequal groups!",
-                type = "warning",
-                text = paste(
-                    "Group 1:",
-                    length(contrast1),
-                    "items; Group 2:",
-                    length(contrast2),
-                    "items."
-                )
-            )
-        } else if (length(contrast1) == 0 | length(contrast2) == 0) {
-            shinyalert(
-                title = "No contrast variables chosen!",
-                type = "warning",
-                text = paste(
-                    "Please choose at least one contrast variable per group."
-                )
-            )
-        } else {
-            for (i in 1:length(contrast1)) {
-                output[i] <- paste0(contrast1[i], " - ", contrast2[i])
-            }
-            output <- paste(output, collapse = ',', sep = '')
-            reg_contrast$groups <- output
-
         }
-        enable("reg_contrast_check")
-        updatePrettyCheckbox(session = session,
-                             inputId = "reg_contrast_check",
-                             value = TRUE)
-
     })
 
     observeEvent(input$reg_choose_vars, {
-        varNames <- c(input$reg_chosen_sample, input$reg_chosen_group, input$reg_chosen_node, input$reg_chosen_region)
-        # varNames <- names(variableNames)
+        print("WE ARE CHOOSING VARIABLES!!!")
+        print(reg_xt)
+        print(colnames(reg_training()[[1, 1]][input$reg_variables_csv_rows_selected[1]]))
+        if(reg_xt == "csv"){
+            print(reg_xt)
+            varNames <- c(colnames(reg_training()[[1, 1]])[input$reg_variables_csv_rows_selected[1]], 
+                          colnames(reg_training()[[1, 1]])[input$reg_variables_csv_rows_selected[2]])
+            paste(varNames)
+        } else if(reg_xt == "mat"){
+            varNames <- c(input$reg_chosen_sample, input$reg_chosen_group, input$reg_chosen_node, input$reg_chosen_region)
+        }
+        
         print(varNames)
         vars = "You chose: "
         for (i in 1:length(varNames)) {
@@ -2063,7 +1982,7 @@ server <- function(input, output, session) {
                 )
             )
         )
-        print(reg_contrast$groups)
+        # print(reg_contrast$groups)
         enable("reg_variable_check")
         updatePrettyCheckbox(session = session,
                              inputId = "reg_variable_check",
@@ -2076,41 +1995,58 @@ server <- function(input, output, session) {
             tools::file_path_sans_ext(input$reg_file_data$name)
         dir.create(file.path(tempdir(), '/OUTPUT'), showWarnings = FALSE)
         dir.create(file.path(tempdir(), '/OUTPUT', '/REGRESSION'), showWarnings = FALSE)
-        annotfile <- input$reg_file_annotations$datapath
-        samplesvar <- input$reg_chosen_sample
-        groupvar <- input$reg_chosen_group
+        
+        if (reg_xt == "csv"){
+            samplesvar <- colnames(reg_training()[[1, 1]])[input$reg_variables_csv_rows_selected[1]]
+            groupvar <- colnames(reg_training()[[1, 1]])[input$reg_variables_csv_rows_selected[2]]
+        } else if (reg_xt == "mat"){
+            annotfile <- input$reg_file_annotations$datapath
+            samplesvar <- input$reg_chosen_sample
+            groupvar <- input$reg_chosen_group
+        }
+        
+        
         outdir <- paste0(tempdir(), '/OUTPUT/REGRESSION')
-
-        proc_data <- reg_inputDatProcess(
-            c(
-                "y",
-                "d",
-                "c",
-                "a",
-                "s",
-                matfile,
-                matfilenoext,
-                annotfile,
-                samplesvar,
-                groupvar,
-                outdir
+        
+        if(reg_xt == "mat") {
+            proc_data <- reg_inputDatProcess(
+                c(
+                    "y",
+                    "d",
+                    "c",
+                    "a",
+                    "s",
+                    matfile,
+                    matfilenoext,
+                    annotfile,
+                    samplesvar,
+                    groupvar,
+                    outdir
+                )
             )
-        )
+        } else if (reg_xt == "csv") {
+            proc_data <- reg_input_dat_process_2D(
+                c(
+                    "y",
+                    "d",
+                    "c",
+                    "a",
+                    "s",
+                    matfile,
+                    matfilenoext,
+                    samplesvar,
+                    groupvar,
+                    outdir
+                )
+            )
+        }
+
+        
 
         raw_sample_dfm$raw_sample_dfm <- proc_data[1]
         raw_sample_dfm$raw_sample_dfm_wo_uni <- proc_data[2]
         removeModal()
 
-
-        insertUI(
-            selector = "#reg_configfilebutton",
-            where = "afterEnd",
-            ui = fileInput(
-                inputId = "reg_up_configs",
-                label = "Upload Config File",
-                multiple = FALSE
-            )
-        )
         enable("reg_inputdata_check")
         updatePrettyCheckbox(session = session,
                              inputId = "reg_inputdata_check",
@@ -2281,7 +2217,13 @@ server <- function(input, output, session) {
 
     # Univariate button
     observeEvent(input$reg_univariate, {
-        req(input$reg_file_data, input$reg_file_annotations, input$reg_file_node)
+        if(reg_xt == "mat"){
+            req(input$reg_file_data, input$reg_file_annotations, input$reg_file_node)
+        } else if (reg_xt == "csv"){
+            print("UNIVARIATE  csv 2D")
+            req(input$reg_file_data)
+        }
+        
         
         # unlink(file.path(tempdir(), 'OUTPUT'), recursive = TRUE, force = TRUE)
 
@@ -2304,9 +2246,6 @@ server <- function(input, output, session) {
                    showWarnings = FALSE)
         outdir <-
             normalizePath(file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE'))
-        # configs <- uploaded_configs()[2][[1]]
-        print(reg_contrast$groups)
-        contrast <- reg_contrast$groups[1]
         node_id_var <- input$reg_chosen_node
         region_name_var <- input$reg_chosen_region
 
@@ -2314,57 +2253,57 @@ server <- function(input, output, session) {
         inputArgs <- reg_univariateConfigs(reg_inputConfigs())
         inputArgs[6] <- dat_file
         inputArgs[7] <- matfilenoext
-        inputArgs[32] <- nodefile
         inputArgs[8] <- outdir
-        inputArgs[33] <- node_id_var
-        inputArgs[34] <- region_name_var
+        
+        
+        if(reg_xt == "mat"){
+            inputArgs[32] <- nodefile
+            inputArgs[33] <- node_id_var
+            inputArgs[34] <- region_name_var
+        }
 
+        show_modal_spinner(text = "Processing...")
         withConsoleRedirect("reg_console", {
-            # invalidateLater(100)
-            out <- reg_univariate(inputArgs)
-
+            if(reg_xt == "mat"){
+                out <- reg_univariate(inputArgs)
+            } else if (reg_xt == "csv"){
+                reg_univariate_2D(inputArgs)
+            }
         })
-        print(out)
-        # setwd(dirname(rstudioapi::getSourceEditorContext()$path))
-        # normdata$n <- data
-        #
-        # output$reg_plot <- renderPlotly({
-        #     normdata <- out[[1]]
-        #     fit_dfm <- out[[2]]
-
-        #     dfm <- data.frame(normdata$genes, normdata$E)
-        #     pcutoff <- input$reg_uni_alpha
-        #     pb_name <- fit_dfm[fit_dfm$P.Value < pcutoff, 'ProbeName']
-        #     dfm <- dfm[dfm[, 'ProbeName'] %in% pb_name, ]
-        #     ogNcol <- dim(normdata$E)[2]
-        #     annoNcol <- dim(dfm)[2]
-        #     s <- (annoNcol - ogNcol + 1):annoNcol
-        #     mtx <- as.matrix(dfm[, s])
-
-        #     heatmaply(mtx)
-        # })
+        remove_modal_spinner() 
 
         enable("reg_univariate_check")
         updatePrettyCheckbox(session = session,
                              inputId = "reg_univariate_check",
                              value = TRUE)
-
+        
+        
         # converting PDF results to PNGs to display in renderImage()
+        if (file.exists(file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE', 'Rplots.pdf'))){
+            print("Rplots.pdf exists!, deleting now")
+        } else {
+            print("Rplots.pdf does not exist!")
+        }
         pdf.list <-
             list.files(path = file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE'),
                        pattern = ".pdf$")
         lapply(
             pdf.list,
             FUN = function(files) {
-                pdf_convert(
-                    files,
-                    format = "png",
-                    filenames = paste0(
-                        sep = "",
-                        tools::file_path_sans_ext(files),
-                        ".png"
+                if (basename(files) == "Rplots.pdf") {
+                    NULL
+                } else {
+                    pdf_convert(
+                        files,
+                        format = "png",
+                        filenames = paste0(
+                            dirname(files),
+                            "/PNGFILES/" ,
+                            tools::file_path_sans_ext(basename(files)),
+                            ".png"
+                        )
                     )
-                )
+                }
             }
         )
         #updating the Select Input with the png filenames
@@ -2382,17 +2321,32 @@ server <- function(input, output, session) {
 
     # svm button
     observeEvent(input$reg_svm, {
-        req(input$reg_file_data, input$reg_file_annotations, input$reg_file_node)
+        if (reg_xt == "mat"){
+            req(input$reg_file_data, input$reg_file_annotations, input$reg_file_node)
+        } else if (reg_xt == "csv"){
+            req(input$reg_file_data)
+        }
+        
 
         matfilenoext <-
             tools::file_path_sans_ext(input$reg_file_data$name)
 
         dat_file <- switch(
             input$reg_modeltype,
-            reg_withp = paste0(tempdir(), "/OUTPUT/REGRESSION/UNIVARIATE/", matfilenoext, "_ml.csv"),
-            reg_withoutp = paste0(tempdir(), "/OUTPUT/REGRESSION/", matfilenoext, "_2D.csv")
+            reg_noneset = paste0(tempdir(), "/OUTPUT/REGRESSION/", matfilenoext, "_2D.csv"),
+            reg_kset = paste0(tempdir(), "/OUTPUT/REGRESSION/UNIVARIATE/", matfilenoext, "_ml.csv"),
+            reg_uset = paste0(tempdir(), "/OUTPUT/REGRESSION/", matfilenoext, "_2D.csv")
         )
-
+        
+        # cvuni <- FALSE
+        cvuni <- switch(
+            input$reg_modeltype,
+            reg_noneset = FALSE,
+            reg_kset = FALSE,
+            reg_uset = TRUE
+        )
+        print(cvuni)
+        
         do.call(file.remove, list(list.files(
             file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'ML_SVM'),
             full.names = TRUE, recursive = TRUE
@@ -2410,11 +2364,16 @@ server <- function(input, output, session) {
 
         nodefile <- input$reg_file_node$datapath
         # configs <- uploaded_configs()[2][[1]]
-        contrast <- reg_contrast$groups[1]
-        psetting <- 3
-        cores <- 2
-        cvuni <- FALSE
-
+        # contrast <- reg_contrast$groups[1]
+        
+        if (isTruthy(input$reg_cores)){
+            paste0("parallel computing", input$reg_cores)
+            psetting <- TRUE
+            cores <- input$reg_cores
+        } else {
+            print("no parallel computing")
+        }
+        
         # getting values from input fields into an args[] format
         inputArgs <- reg_ml_svmConfigs(reg_inputConfigs())
         inputArgs[6] <- dat_file
@@ -2423,50 +2382,43 @@ server <- function(input, output, session) {
         inputArgs[9] <- psetting
         inputArgs[10] <- cores
         inputArgs[56] <- cvuni
-        inputArgs[64] <- contrast
-
-
-        withConsoleRedirect("reg_console", {
+        
+        # if(reg_xt == "mat"){
+        #     inputArgs[64] <- contrast
+        # }
+        
+        
+        show_modal_spinner(text = "Running classifier...")
+        # withConsoleRedirect("reg_console", {
             # invalidateLater(100)
             reg_ml_svm(inputArgs)
 
-        })
-        
+        # })
+        remove_modal_spinner()
 
         # converting PDF results to PNGs to display in renderImage()
         pdf.list <-
             list.files(path = file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'ML_SVM'),
                        pattern = ".pdf$")
-
-        # pdf_convert(pdf.list[1], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[1]), ".png"))
-        # pdf_convert(pdf.list[2], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[2]), ".png"))
-        # # pdf_convert(pdf.list[3], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[3]), ".png"))
-        # pdf_convert(pdf.list[4], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[4]), ".png"))
-        # pdf_convert(pdf.list[5], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[5]), ".png"))
-        # pdf_convert(pdf.list[6], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[6]), ".png"))
-        # pdf_convert(pdf.list[7], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[7]), ".png"))
-        # pdf_convert(pdf.list[8], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[8]), ".png"))
-        # pdf_convert(pdf.list[9], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[9]), ".png"))
-        # pdf_convert(pdf.list[10], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[10]), ".png"))
-        # pdf_convert(pdf.list[11], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[11]), ".png"))
-        # pdf_convert(pdf.list[12], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[12]), ".png"))
-        # pdf_convert(pdf.list[13], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[13]), ".png"))
-        # pdf_convert(pdf.list[14], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[14]), ".png"))
-        # lapply(
-        #     pdf.list,
-        #     FUN = function(files) {
-        #         pdf_convert(
-        #             files,
-        #             format = "png",
-        #             filenames = paste0(
-        #                 sep = "",
-        #                 "PNGFILES/" ,
-        #                 tools::file_path_sans_ext(files),
-        #                 ".png"
-        #             )
-        #         )
-        #     }
-        # )
+        lapply(
+            pdf.list,
+            FUN = function(files) {
+                if (basename(files) == "Rplots.pdf") {
+                    NULL
+                } else {
+                    pdf_convert(
+                        files,
+                        format = "png",
+                        filenames = paste0(
+                            dirname(files),
+                            "/PNGFILES/" ,
+                            tools::file_path_sans_ext(basename(files)),
+                            ".png"
+                        )
+                    )
+                }
+            }
+        )
 
         #updating the Select Input with the png filenames
         filenames <-
@@ -2483,7 +2435,7 @@ server <- function(input, output, session) {
         updatePrettyCheckbox(session = session,
                              inputId = "reg_svm_check",
                              value = TRUE)
-
+        closeAllConnections()
 
     })
 
@@ -2528,12 +2480,11 @@ server <- function(input, output, session) {
             paste("regression_report-", Sys.Date(), ".pdf", sep="")
         },
         content = function(file) {
+            setwd('/srv/shiny-server/')
             tempReport <- file.path(tempdir(), 'reg_results.Rmd')
-            file.copy(file.path('reg_results.Rmd'), tempReport, overwrite = TRUE)
-            print("YOOOSSS")
-            params <- list(n = 100)
-            rmarkdown::render(input = tempReport)
-            file.copy(file.path(tempdir(), 'reg_results.pdf'), file)
+            file.copy(file.path('srv', 'shiny-server', 'reg_results.Rmd'), tempReport, overwrite = TRUE)
+            rmarkdown::render(input = 'reg_results.Rmd')
+            file.copy(file.path('reg_results.pdf'), file)
         }
         
     )
@@ -2549,71 +2500,2607 @@ server <- function(input, output, session) {
             file.copy(tempzip, file)
         }
     )
-
-    # output$brain <- renderBrain({
-    #     brain = threeBrain::freesurfer_brain(
-    #         fs_subject_folder = '~/rave_data/others/three_brain/N27/',
-    #         subject_name = 'N27',
-    #         additional_surfaces = c('white', 'smoothwm')
-    #     )
-    #     plot(brain)
+    
+    
+    ######################### CV-ONLY ANALYSIS ################################################
+    
+    observeEvent(input$cv_file_data, {
+        enable("cv_upload_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_upload_check",
+                             value = TRUE)
+        
+    })
+    
+    # module test code
+    # datafiles <- uploadFilesServer("regular")
+    # 
+    # output$training <- renderDataTable({
+    #     datafiles$data()[, , 1]
     # })
+    
+    
+    
+    # checking and loading only the mat file
+    cv_training <- reactive({
+        req(input$cv_file_data)
+        cv_xt <<- tools::file_ext(input$cv_file_data$datapath)
+        dater = matrix(list(),
+                       nrow = 1,
+                       ncol = length(input$cv_file_data$name))
+        
+        if (cv_xt == "mat") {
+            df <- readMat(input$cv_file_data$datapath)
+            df <- df[[1]]
+            dater[[1, 1]] <- df
+            return(dater)
+        } else if (cv_xt == "csv") {
+            df <- read.csv(input$cv_file_data$datapath,
+                           header = TRUE,
+                           sep = ",")
+            # dater[[1, 1]] <- df
+            return(df)
+        }
+        
+    })
+    
+    cv_annotations <- reactive({
+        req(cv_xt)
+        if (cv_xt == "csv"){
+            req(input$cv_file_data)
+            print("annotations 2D data!!")
+            dater <- data.frame(cv_training()[2])
+            return(dater)
+        } else if (cv_xt == "mat") {
+            req(input$cv_file_annotations)
+            dater = matrix(list(),
+                           nrow = 1,
+                           ncol = 1)
+            df <- read.csv(input$cv_file_annotations$datapath,
+                           header = TRUE,
+                           sep = ",")
+            dater[[1, 1]] <- df
+            return(dater)
+        }
+        
+    })
+    
+    
+    cv_node <- reactive({
+        req(cv_xt)
+        if(cv_xt == "csv"){
+            print("node 2D data!!!!")
+        } else {
+            req(input$cv_file_node)
+            dater = matrix(list(),
+                           nrow = 1,
+                           ncol = 1)
+            df <- read.csv(input$cv_file_node$datapath,
+                           header = TRUE,
+                           sep = ",")
+            dater[[1, 1]] <- df
+            return(dater)
+        }
+    })
+    output$cv_training <- DT::renderDataTable({
+        cv_xt <<- tools::file_ext(input$cv_file_data$datapath)
+        req(input$cv_file_data, cv_xt)
+        if (cv_xt == "csv") {
+            d <- cv_training()
+        } else if (cv_xt == "mat") {
+            d <- cv_training()[[1, 1]][, , 1]
+            # d <- readMat(input$file_data$datapath)
+            # d <- df[[1]]
+        }
+        datatable(
+            # training()[[1, 1]][, , 1],
+            # training()[[1, 1]][, , 1], ######### change this after
+            d,
+            options = list(
+                autoWidth = TRUE,
+                lengthChange = FALSE,
+                scrollX = TRUE,
+                scrollY = TRUE,
+                searching = FALSE
+            ),
+            selection = list(target = 'column')
+        )
+        # %>% formatRound(columns=c(1:ncol(training()[[1, 1]][, ,1])), 3)
+    })
+    
+    output$cv_annotation <- DT::renderDataTable({
+        cv_xt <<- tools::file_ext(input$cv_file_data$datapath)
+        if(cv_xt == "csv"){
+            # print(input$training_columns_selected)
+            d <- training()
+            d <- d[, input$cv_training_columns_selected]
+        } else if (cv_xt == "mat"){
+            d <- cv_annotations()[[1, 1]]
+        }
+        datatable(
+            matrix(d),
+            options = list(
+                autowidth = TRUE,
+                pageLength = 10,
+                lengthChange = FALSE,
+                searching = FALSE
+            )
+        )
+    })
+    
+    output$cv_node <- DT::renderDataTable({
+        if(cv_xt == "csv"){
+            
+        } else {
+            datatable(
+                cv_node()[[1, 1]],
+                options = list(
+                    autowidth = TRUE,
+                    pageLength = 10,
+                    lengthChange = FALSE,
+                    searching = FALSE
+                )
+            )
+        }
+    })
+    
+    
+    
+    # rendering the drag and drop with variable names
+    output$cv_variables_csv <- DT::renderDataTable({
+        d <- cv_training()
 
+        labs <- c(colnames(d))
+        datatable(
+            matrix(labs),
+            options = list(
+                autowidth = TRUE,
+                pageLength = 10,
+                lengthChange = FALSE,
+                searching = FALSE
+            )
+        )
+
+    })
+
+    output$cv_samplevar <- renderText({
+        d <- cv_training()
+        paste("Selected Sample Variable: ", colnames(d)[input$cv_variables_csv_rows_selected[1]])
+    })
+    output$cv_groupvar <- renderText({
+        d <- cv_training()
+        paste("Selected Group Variable: ", colnames(d)[input$cv_variables_csv_rows_selected[2]])
+    })
+    output$cv_variables <- renderUI({
+        req(input$cv_confirmcontrast)
+        cv_xt <<- tools::file_ext(input$cv_file_data$datapath)
+        print(cv_xt)
+        if(cv_xt == "csv"){
+
+            box(
+                title = "File Variables from column names",
+                status = "primary",
+                width = 12,
+                collapsible = TRUE,
+                solidHeader = TRUE,
+                dataTableOutput("cv_variables_csv"),
+                verbatimTextOutput("cv_samplevar"),
+                verbatimTextOutput("cv_groupvar"),
+                actionButton(inputId = "cv_choose_vars", label = "Confirm Variables")
+            )
+
+        } else if(cv_xt == "mat"){
+            print("file is not 2d")
+
+            req(input$cv_file_annotations, input$cv_file_node)
+            labs <-
+                c(colnames(cv_annotations()[[1, 1]]), colnames(cv_node()[[1, 1]]))
+
+            useShinyjs()
+            tagList(
+                box(
+                    title = "File Variables",
+                    status = "primary",
+                    width = 12,
+                    collapsible = TRUE,
+                    solidHeader = TRUE,
+
+
+                    fluidRow(
+                        class = "panel-body",
+                        column(
+                            width = 4,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "File Variables"),
+                                tags$div(class = "panel-body av_vars_body",
+                                         id = "cv_availablevars",
+                                         icon_list(labs)),
+                                tags$style(HTML('
+                                        '))
+                            )
+                        ),
+                        column(
+                            width = 4,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Sample"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_chosen_sample")
+                            ),
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Group"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_chosen_group")
+                            )
+                        ),
+                        column(
+                            width = 4,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Node ID"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_chosen_node")
+                            ),
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Region"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_chosen_region")
+                            )
+                        ),
+                        #################### sortable code for drag and drop
+                        sortable_js(
+                            "cv_availablevars",
+                            options = sortable_options(
+                                group = list(pull = TRUE,
+                                             name = "cv_allvars",
+                                             put = TRUE),
+                                onSort = sortable_js_capture_input("cv_sort_vars")
+                            )
+
+                        ),
+                        sortable_js(
+                            "cv_chosen_sample",
+                            options = sortable_options(
+                                group = list(
+                                    group = "cv_allvars",
+                                    put = htmlwidgets::JS('function (to) { return to.el.children.length < 1; }'),
+                                    pull = htmlwidgets::JS(
+                                        'function (to) { document.getElementById("cv_chosen_sample").style.backgroundColor = "white"; }'
+                                    )
+                                ),
+                                swapClass = "sortable-swap-highlight",
+                                onSort = sortable_js_capture_input("cv_chosen_sample")
+                            )
+                        ),
+                        sortable_js(
+                            "cv_chosen_group",
+                            options = sortable_options(
+                                group = list(
+                                    group = "cv_allvars",
+                                    put = htmlwidgets::JS('function (to) { return to.el.children.length < 1; }'),
+                                    pull = htmlwidgets::JS(
+                                        'function (to) { document.getElementById("cv_chosen_group").style.backgroundColor = "white"; }'
+                                    )
+                                ),
+                                swapClass = "sortable-swap-highlight",
+                                onSort = sortable_js_capture_input("cv_chosen_group")
+                                # onMove = htmlwidgets::JS('document.getElementById("chosen_group").style.backgroundColor = "lightblue";')
+                            )
+                        ),
+                        sortable_js(
+                            "cv_chosen_node",
+                            options = sortable_options(
+                                group = list(
+                                    group = "cv_allvars",
+                                    put = htmlwidgets::JS('function (to) { return to.el.children.length < 1; }'),
+                                    pull = htmlwidgets::JS(
+                                        'function (to) { document.getElementById("cv_chosen_node").style.backgroundColor = "white"; }'
+                                    )
+                                ),
+                                swapClass = "sortable-swap-highlight",
+                                onSort = sortable_js_capture_input("cv_chosen_node")
+                            )
+                        ),
+                        sortable_js(
+                            "cv_chosen_region",
+                            options = sortable_options(
+                                group = list(
+                                    group = "cv_allvars",
+                                    put = htmlwidgets::JS('function (to) { return to.el.children.length < 1; }'),
+                                    pull = htmlwidgets::JS(
+                                        'function (to) { document.getElementById("cv_chosen_region").style.backgroundColor = "white"; }'
+                                    )
+                                ),
+                                swapClass = "sortable-swap-highlight",
+                                onSort = sortable_js_capture_input("cv_chosen_region")
+                            )
+                        )
+                    ),
+                    actionButton(inputId = "cv_choose_vars",
+                                 label = "Confirm Variables")
+                )
+
+
+            )
+
+        } else {
+            print("wrong input file")
+        }
+
+    })
+
+
+    output$cv_groups <- renderUI({
+        req(input$cv_file_data)
+        cv_xt <<- tools::file_ext(input$cv_file_data$datapath)
+        if(cv_xt == "csv"){
+            req(input$cv_training_columns_selected)
+            print("contrast !! file 2d!")
+
+            d <- read.csv(input$cv_file_data$datapath,
+                          header = TRUE,
+                          sep = ",")
+            d <- matrix(d[, input$cv_training_columns_selected])
+            # print(d)
+
+            groups <- data.frame(d)
+            groups <- count(groups$group)
+            groupnames <- unique(d)
+            groupcount <- groups$freq
+            numgroups <- length(groups)
+            print("group names")
+            print(groupnames)
+            print(unique(d))
+            useShinyjs()
+            tagList(
+                box(
+                    title = "Contrast variables",
+                    status = "primary",
+                    width = 12,
+                    collapsible = TRUE,
+                    solidHeader = TRUE,
+                    fluidRow(
+                        class = "panel-body",
+                        column(
+                            width = 3,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Group Variables"),
+                                tags$div(
+                                    class = "panel-body",
+                                    id = "cv_availablegroups",
+                                    icon_list(groupnames)
+                                ),
+                                tags$style(HTML('
+                                '))
+                            )
+                        ),
+                        column(
+                            width = 3,
+                            tags$div(
+                                id = "cv_contrastgroup1",
+                                class = "panel panel-default cv_contrast1",
+                                tags$div(class = "panel-heading",
+                                         "Group 1"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_contrast1")
+                            )
+                        ),
+                        column(width = 1,
+                               tags$div(class = "h1",
+                                        "VS.")),
+                        column(
+                            width = 3,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Group 2"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_contrast2")
+                            )
+                        ),
+
+                        column(
+                            width = 2,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         icon("trash"),
+                                         "Bin item"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_trashbin")
+                            )
+                        )
+                    ),
+                    sortable_js(
+                        "cv_availablegroups",
+                        options = sortable_options(
+                            group = list(
+                                pull = "clone",
+                                name = "cv_allsorts",
+                                put = FALSE
+                            ),
+                            onSort = sortable_js_capture_input("cv_sort_vars")
+                        )
+                    ),
+                    sortable_js(
+                        "cv_contrast1",
+                        options = sortable_options(
+                            group = list(
+                                group = "cv_allsorts",
+                                put = TRUE,
+                                pull = TRUE
+                            ),
+                            swapClass = "sortable-swap-highlight",
+                            onSort = htmlwidgets::JS('function (to) { var count = cv_contrast1.children.length; console.log(count);  var c = cv_contrast1.children;
+                                                 var colors = ["khaki", "indianred", "steelblue", "seagreen", "plum"]
+
+                                                 if (count >= 1){
+                                                 for (i = 0; i < count; i++){
+                                                 if (i%5 == 0) {
+                                                 var j = 0;
+                                                 }
+                                                 var color = colors[j]
+                                                 c[i].style.backgroundColor = color;
+                                                 j += 1;
+                                                 var text = c[i].innerText.match(/[a-zA-Z]+/g);
+                                                 c[i].innerText = i.toString().concat(". ", text);
+                                                 c[i].style.fontWeight = "bold";
+                                                 }
+                                                 console.log("yeeeeeehehehrerhq;lrehq;werh");
+
+                                                 }}'),
+                            onAdd = sortable_js_capture_input("cv_contrast_group1")
+                        )
+
+                    ),
+                    sortable_js(
+                        "cv_contrast2",
+                        options = sortable_options(
+                            group = list(
+                                group = "cv_allsorts",
+                                put = TRUE,
+                                pull = TRUE
+                            ),
+                            swapClass = "sortable-swap-highlight",
+                            onSort = htmlwidgets::JS('function (to) { var count = cv_contrast2.children.length; console.log(count);  var c = cv_contrast2.children;
+                                                 var colors = ["khaki", "indianred", "steelblue", "seagreen", "plum"]
+
+                                                 if (count >= 1){
+                                                 for (i = 0; i < count; i++){
+                                                 if (i%5 == 0) {
+                                                 var j = 0;
+                                                 }
+                                                 var color = colors[j]
+                                                 c[i].style.backgroundColor = color;
+                                                 j += 1;
+                                                 var text = c[i].innerText.match(/[a-zA-Z]+/g);
+                                                 c[i].innerText = i.toString().concat(". ", text);
+                                                 c[i].style.fontWeight = "bold";
+
+                                                 }
+                                                 console.log("yeeeeeehehehrerhq;lrehq;werh");
+
+                                                 }}'),
+                            onAdd = sortable_js_capture_input("cv_contrast_group2")
+                        )
+
+                    ),
+                    sortable_js(
+                        "trashbin",
+                        options = sortable_options(
+                            group = list(
+                                group = "cv_allsorts",
+                                put = TRUE,
+                                pull = TRUE
+                            ),
+                            onAdd = htmlwidgets::JS("function (evt) { this.el.removeChild(evt.item); }")
+                        )
+                    ),
+                    actionButton(inputId = "cv_confirmcontrast", label = "Confirm")
+                )
+            )
+        }else if (cv_xt == "mat"){
+            req(input$cv_file_annotations, input$cv_file_node)
+            groups <- data.frame(cv_annotations()[[1, 1]])
+            groups <- count(groups$group)
+            groupnames <- unique(groups$x)
+            print("contrast variables")
+            print(groupnames)
+            groupcount <- groups$freq
+            numgroups <- length(groups)
+            useShinyjs()
+            tagList(
+                box(
+                    title = "Contrast variables",
+                    status = "primary",
+                    width = 12,
+                    collapsible = TRUE,
+                    solidHeader = TRUE,
+                    fluidRow(
+                        class = "panel-body",
+                        column(
+                            width = 3,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Group Variables"),
+                                tags$div(
+                                    class = "panel-body",
+                                    id = "cv_availablegroups",
+                                    icon_list(groupnames)
+                                ),
+                                tags$style(HTML('
+                                '))
+                            )
+                        ),
+                        column(
+                            width = 3,
+                            tags$div(
+                                id = "cv_contrastgroup1",
+                                class = "panel panel-default contrast1",
+                                tags$div(class = "panel-heading",
+                                         "Group 1"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_contrast1")
+                            )
+                        ),
+                        column(width = 1,
+                               tags$div(class = "h1",
+                                        "VS.")),
+                        column(
+                            width = 3,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Group 2"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_contrast2")
+                            )
+                        ),
+
+                        column(
+                            width = 2,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         icon("trash"),
+                                         "Bin item"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_trashbin")
+                            )
+                        )
+                    ),
+                    sortable_js(
+                        "cv_availablegroups",
+                        options = sortable_options(
+                            group = list(
+                                pull = "clone",
+                                name = "cv_allsorts",
+                                put = FALSE
+                            ),
+                            onSort = sortable_js_capture_input("cv_sort_vars")
+                        )
+                    ),
+                    sortable_js(
+                        "cv_contrast1",
+                        options = sortable_options(
+                            group = list(
+                                group = "cv_allsorts",
+                                put = TRUE,
+                                pull = TRUE
+                            ),
+                            swapClass = "sortable-swap-highlight",
+                            onSort = htmlwidgets::JS('function (to) { var count = cv_contrast1.children.length; console.log(count);  var c = cv_contrast1.children;
+                                                 var colors = ["khaki", "indianred", "steelblue", "seagreen", "plum"]
+
+                                                 if (count >= 1){
+                                                 for (i = 0; i < count; i++){
+                                                 if (i%5 == 0) {
+                                                 var j = 0;
+                                                 }
+                                                 var color = colors[j]
+                                                 c[i].style.backgroundColor = color;
+                                                 j += 1;
+                                                 var text = c[i].innerText.match(/[a-zA-Z]+/g);
+                                                 c[i].innerText = i.toString().concat(". ", text);
+                                                 c[i].style.fontWeight = "bold";
+                                                 }
+                                                 console.log("yeeeeeehehehrerhq;lrehq;werh");
+
+                                                 }}'),
+                            onAdd = sortable_js_capture_input("cv_contrast_group1")
+                        )
+
+                    ),
+                    sortable_js(
+                        "cv_contrast2",
+                        options = sortable_options(
+                            group = list(
+                                group = "cv_allsorts",
+                                put = TRUE,
+                                pull = TRUE
+                            ),
+                            swapClass = "sortable-swap-highlight",
+                            onSort = htmlwidgets::JS('function (to) { var count = cv_contrast2.children.length; console.log(count);  var c = cv_contrast2.children;
+                                                 var colors = ["khaki", "indianred", "steelblue", "seagreen", "plum"]
+
+                                                 if (count >= 1){
+                                                 for (i = 0; i < count; i++){
+                                                 if (i%5 == 0) {
+                                                 var j = 0;
+                                                 }
+                                                 var color = colors[j]
+                                                 c[i].style.backgroundColor = color;
+                                                 j += 1;
+                                                 var text = c[i].innerText.match(/[a-zA-Z]+/g);
+                                                 c[i].innerText = i.toString().concat(". ", text);
+                                                 c[i].style.fontWeight = "bold";
+
+                                                 }
+                                                 }}'),
+                            onAdd = sortable_js_capture_input("cv_contrast_group2")
+                        )
+
+                    ),
+                    sortable_js(
+                        "cv_trashbin",
+                        options = sortable_options(
+                            group = list(
+                                group = "cv_allsorts",
+                                put = TRUE,
+                                pull = TRUE
+                            ),
+                            onAdd = htmlwidgets::JS("function (evt) { this.el.removeChild(evt.item); }")
+                        )
+                    ),
+                    actionButton(inputId = "cv_confirmcontrast", label = "Confirm")
+                )
+            )
+        }
+
+
+
+
+    })
+
+    # getting configurations from input fields (defaults)
+    cv_inputConfigs <- reactive({
+        configs <- list(
+            cv_random_state = input$cv_random_state,
+
+            cv_log2_trans = input$cv_log2_trans,
+
+            cv_htmap_textsize_col = input$cv_htmap_textsize_col,
+            cv_htmap_textangle_col = input$cv_htmap_textangle_col,
+            cv_htmap_lab_row = input$cv_htmap_lab_row,
+            cv_htmap_textsize_row = input$cv_htmap_textsize_row,
+            cv_htmap_keysize = input$cv_htmap_keysize,
+            cv_htmap_key_xlab = paste0('"', input$cv_htmap_key_xlab, '"'),
+            cv_htmap_key_ylab =  paste0('"', input$cv_htmap_key_ylab, '"'),
+            cv_htmap_margin = paste0('"c', input$cv_htmap_margin, '"'),
+            cv_htmap_width = input$cv_htmap_width,
+            cv_htmap_height = input$cv_htmap_height,
+
+            cv_pca_scale_data = input$cv_pca_scale_data,
+            cv_pca_center_data = input$cv_pca_center_data,
+            cv_pca_pc = paste0('"c', input$cv_pca_pc, '"'),
+            cv_pca_biplot_samplelabel_type = paste0('"', input$cv_pca_biplot_samplelabel_type, '"'),
+            cv_pca_biplot_samplelabel_size = input$cv_pca_biplot_samplelabel_size,
+            cv_pca_biplot_symbol_size = input$cv_pca_biplot_symbol_size,
+            cv_pca_biplot_ellipse = input$cv_pca_biplot_ellipse,
+            cv_pca_biplot_ellipse_conf = input$cv_pca_biplot_ellipse_conf,
+            cv_pca_biplot_loading = input$cv_pca_biplot_loading,
+            cv_pca_biplot_loading_textsize = input$cv_pca_biplot_loading_textsize,
+            cv_pca_biplot_multi_density = input$cv_pca_biplot_multi_density,
+            cv_pca_biplot_multi_striplabel_size = input$cv_pca_biplot_multi_striplabel_size,
+            cv_pca_rightside_y = input$cv_pca_rightside_y,
+            cv_pca_x_tick_label_size = input$cv_pca_x_tick_label_size,
+            cv_pca_y_tick_label_size = input$cv_pca_y_tick_label_size,
+            cv_pca_width = input$cv_pca_width,
+            cv_pca_height = input$cv_pca_height,
+
+            cv_uni_fdr = input$cv_uni_fdr,
+            cv_uni_alpha = input$cv_uni_alpha,
+            cv_uni_fold_change = input$cv_uni_fold_change,
+            cv_volcano_n_top_connections = input$cv_volcano_n_top_connections,
+            cv_volcano_symbol_size = input$cv_volcano_symbol_size,
+            cv_volcano_sig_colour = paste0('"', input$cv_volcano_sig_colour, '"'),
+            cv_volcano_nonsig_colour = paste0('"', input$cv_volcano_nonsig_colour, '"'),
+            cv_volcano_x_text_size = input$cv_volcano_x_text_size,
+            cv_volcano_y_text_size = input$cv_volcano_y_text_size,
+            cv_volcano_width = input$cv_volcano_width,
+            cv_volcano_height = input$cv_volcano_height,
+
+            cv_sig_htmap_textsize_col = input$cv_sig_htmap_textsize_col,
+            cv_sig_htmap_textangle_col = input$cv_sig_htmap_textangle_col,
+            cv_sig_htmap_textsize_row = input$cv_sig_htmap_textsize_row,
+            cv_sig_htmap_keysize = input$cv_sig_htmap_keysize,
+            cv_sig_htmap_key_xlab = paste0('"', input$cv_sig_htmap_key_xlab, '"'),
+            cv_sig_htmap_key_ylab = paste0('"', input$cv_sig_htmap_key_ylab, '"'),
+            cv_sig_htmap_margin = paste0('"c', input$cv_sig_htmap_margin, '"'),
+            cv_sig_htmap_width = input$cv_sig_htmap_width,
+            cv_sig_htmap_height = input$cv_sig_htmap_height,
+            cv_sig_pca_pc = paste0('"c', input$cv_sig_pca_pc, '"'),
+            cv_sig_pca_biplot_ellipse_conf = input$cv_sig_pca_biplot_ellipse_conf,
+
+            cv_cpu_cluster = paste0('"', input$cv_cpu_cluster, '"'),
+
+            cv_training_percentage = input$cv_training_percentage,
+
+            cv_svm_cv_center_scale = input$cv_svm_cv_center_scale,
+            cv_svm_cv_kernel = paste0('"', input$cv_svm_cv_kernel, '"'),
+            cv_svm_cv_cross_k = input$cv_svm_cv_cross_k,
+            cv_svm_cv_tune_method = paste0('"', input$cv_svm_cv_tune_method, '"'),
+            cv_svm_cv_tune_cross_k = input$cv_svm_cv_tune_cross_k,
+            cv_svm_cv_tune_boot_n = input$cv_svm_cv_tune_boot_n,
+            cv_svm_cv_fs_rf_ifs_ntree = input$cv_svm_cv_fs_rf_ifs_ntree,
+            cv_svm_cv_fs_rf_sfs_ntree = input$cv_svm_cv_fs_rf_sfs_ntree,
+            cv_svm_cv_best_model_method = paste0('"', input$cv_svm_cv_best_model_method, '"'),
+            cv_svm_cv_fs_count_cutoff = input$cv_svm_cv_fs_count_cutoff,
+
+            cv_svm_cross_k = input$cv_svm_cross_k,
+            cv_svm_tune_cross_k = input$cv_svm_tune_cross_k,
+
+            cv_svm_tune_boot_n = input$cv_svm_tune_boot_n,
+
+            cv_svm_perm_method = paste0('"', input$cv_svm_perm_method, '"'),
+            cv_svm_perm_n = input$cv_svm_perm_n,
+            cv_svm_perm_plot_symbol_size = input$cv_svm_perm_plot_symbol_size,
+            cv_svm_perm_plot_legend_size = input$cv_svm_perm_plot_legend_size,
+            cv_svm_perm_plot_x_label_size = input$cv_svm_perm_plot_x_label_size,
+            cv_svm_perm_plot_x_tick_label_size = input$cv_svm_perm_plot_x_tick_label_size,
+            cv_svm_perm_plot_y_label_size = input$cv_svm_perm_plot_y_label_size,
+            cv_svm_perm_plot_y_tick_label_size = input$cv_svm_perm_plot_y_tick_label_size,
+            cv_svm_perm_plot_width = input$cv_svm_perm_plot_width,
+            cv_svm_perm_plot_height = input$cv_svm_perm_plot_height,
+
+            cv_svm_roc_smooth = input$cv_svm_roc_smooth,
+            cv_svm_roc_symbol_size = input$cv_svm_roc_symbol_size,
+            cv_svm_roc_legend_size = input$cv_svm_roc_legend_size,
+            cv_svm_roc_x_label_size = input$cv_svm_roc_x_label_size,
+            cv_svm_roc_x_tick_label_size = input$cv_svm_roc_x_tick_label_size,
+            cv_svm_roc_y_label_size = input$cv_svm_roc_y_label_size,
+            cv_svm_roc_y_tick_label_size = input$cv_svm_roc_y_tick_label_size,
+            cv_svm_roc_width = input$cv_svm_roc_width,
+            cv_svm_roc_height = input$cv_svm_roc_height,
+
+            cv_svm_rffs_pca_pc = paste0('"c', input$cv_svm_rffs_pca_pc, '"'),
+            cv_svm_rffs_pca_biplot_ellipse_conf = input$cv_svm_rffs_pca_biplot_ellipse_conf,
+
+            cv_rffs_htmap_textsize_col = input$cv_rffs_htmap_textsize_col,
+            cv_rffs_htmap_textangle_col = input$cv_rffs_htmap_textangle_col,
+            cv_rffs_htmap_textsize_row = input$cv_rffs_htmap_textsize_row,
+            cv_rffs_htmap_keysize = input$cv_rffs_htmap_keysize,
+            cv_rffs_htmap_key_xlab = input$cv_rffs_htmap_key_xlab,
+            cv_rffs_htmap_key_ylab = input$cv_rffs_htmap_key_ylab,
+            cv_rffs_htmap_margin = paste0('"c', input$cv_rffs_htmap_margin, '"'),
+            cv_rffs_htmap_width = input$cv_rffs_htmap_width,
+            cv_rffs_htmap_height = input$cv_rffs_htmap_height,
+
+            cv_plsda_validation = paste0('"', input$cv_plsda_validation, '"'),
+            cv_plsda_validation_segment = input$cv_plsda_validation_segment,
+
+            cv_plsda_init_ncomp = input$cv_plsda_init_ncomp,
+
+            cv_plsda_ncomp_select_method = paste0('"', input$cv_plsda_ncomp_select_method, '"'),
+            cv_plsda_ncomp_select_plot_symbol_size = input$cv_plsda_ncomp_select_plot_symbol_size,
+            cv_plsda_ncomp_select_plot_legend_size = input$cv_plsda_ncomp_select_plot_legend_size,
+            cv_plsda_ncomp_select_plot_x_label_size = input$cv_plsda_ncomp_select_plot_x_label_size,
+            cv_plsda_ncomp_select_plot_x_tick_label_size = input$cv_plsda_ncomp_select_plot_x_tick_label_size,
+            cv_plsda_ncomp_select_plot_y_label_size = input$cv_plsda_ncomp_select_plot_y_label_size,
+            cv_plsda_ncomp_select_plot_y_tick_label_size = input$cv_plsda_ncomp_select_plot_y_tick_label_size,
+
+            cv_plsda_perm_method = paste0('"', input$cv_plsda_perm_method, '"'),
+            cv_plsda_perm_n = input$cv_plsda_perm_n,
+            cv_plsda_perm_plot_symbol_size = input$cv_plsda_perm_plot_symbol_size,
+            cv_plsda_perm_plot_legend_size = input$cv_plsda_perm_plot_legend_size,
+            cv_plsda_perm_plot_x_label_size = input$cv_plsda_perm_plot_x_label_size,
+            cv_plsda_perm_plot_x_tick_label_size = input$cv_plsda_perm_plot_x_tick_label_size,
+            cv_plsda_perm_plot_y_label_size = input$cv_plsda_perm_plot_y_label_size,
+            cv_plsda_perm_plot_y_tick_label_size = input$cv_plsda_perm_plot_y_tick_label_size,
+            cv_plsda_perm_plot_width = input$cv_plsda_perm_plot_width,
+            cv_plsda_perm_plot_height = input$cv_plsda_perm_plot_height,
+
+            cv_plsda_scoreplot_ellipse_conf = input$cv_plsda_scoreplot_ellipse_conf,
+
+            cv_plsda_roc_smooth = input$cv_plsda_roc_smooth,
+
+            cv_plsda_vip_alpha = input$cv_plsda_vip_alpha,
+            cv_plsda_vip_boot = input$cv_plsda_vip_boot,
+            cv_plsda_vip_boot_n = input$cv_plsda_vip_boot_n,
+            cv_plsda_vip_plot_errorbar = paste0('"', input$cv_plsda_vip_plot_errorbar, '"'),
+            cv_plsda_vip_plot_errorbar_width = input$cv_plsda_vip_plot_errorbar_width,
+            cv_plsda_vip_plot_errorbar_label_size = input$cv_plsda_vip_plot_errorbar_label_size,
+            cv_plsda_vip_plot_x_textangle = input$cv_plsda_vip_plot_x_textangle,
+            cv_plsda_vip_plot_x_label_size = input$cv_plsda_vip_plot_x_label_size,
+            cv_plsda_vip_plot_x_tick_label_size = input$cv_plsda_vip_plot_x_tick_label_size,
+            cv_plsda_vip_plot_y_label_size = input$cv_plsda_vip_plot_y_label_size,
+            cv_plsda_vip_plot_y_tick_label_size = input$cv_plsda_vip_plot_y_tick_label_size,
+            cv_plsda_vip_plot_width = input$cv_plsda_vip_plot_width,
+            cv_plsda_vip_plot_height = input$cv_plsda_vip_plot_height
+        )
+        # configs_format(configs)
+    })
+
+
+    cv_downloadConfigsData <- reactive({
+        configs <- configs_format(cv_inputConfigs())
+    })
+
+    output$cv_download_configs <- downloadHandler(
+        # configs <- configs_format(inputConfigs()),
+        filename = "configs",
+        content = function(file) {
+            write.table(
+                cv_downloadConfigsData(),
+                file = file,
+                row.names = FALSE,
+                col.names = FALSE,
+                quote = FALSE
+            )
+            # file.copy(file.path(tempdir(),'OUTPUT','configs'), file)
+        },
+        contentType = "application"
+    )
+
+    observeEvent(input$cv_reset_cnfg, {
+        shinyjs::reset("cv_configurations")
+    })
+
+
+    output$cv_debug <-
+        renderText(paste0("Debug: ", input$cv_contrast_group1[2]))
+
+
+    cv_contrast <- reactiveValues()
+
+    observeEvent(input$cv_confirmcontrast, {
+        #check that they're the same length
+        contrast1 <- input$cv_contrast_group1
+        contrast2 <- input$cv_contrast_group2
+        print("CONTRAST BUTTON!!!")
+        print(contrast1)
+        output <- 0
+        if (length(contrast1) != length(contrast2)) {
+            shinyalert(
+                title = "Unequal groups!",
+                type = "warning",
+                text = paste(
+                    "Group 1:",
+                    length(contrast1),
+                    "items; Group 2:",
+                    length(contrast2),
+                    "items."
+                )
+            )
+        } else if (length(contrast1) == 0 | length(contrast2) == 0) {
+            shinyalert(
+                title = "No contrast variables chosen!",
+                type = "warning",
+                text = paste(
+                    "Please choose at least one contrast variable per group."
+                )
+            )
+        } else {
+            for (i in 1:length(contrast1)) {
+                output[i] <- paste0(contrast1[i], " - ", contrast2[i])
+            }
+            output <- paste(output, collapse = ',', sep = '')
+            cv_contrast$groups <- output
+
+        }
+
+        enable("cv_contrast_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_contrast_check",
+                             value = TRUE)
+
+    })
+
+
+    observeEvent(input$cv_choose_vars, {
+        if(cv_xt == "csv"){
+            varNames <- c(colnames(cv_training())[input$cv_variables_csv_rows_selected[1]], colnames(cv_training())[input$cv_variables_csv_rows_selected[2]])
+        } else if (cv_xt == "mat") {
+            varNames <- c(input$cv_chosen_sample, input$cv_chosen_group, input$cv_chosen_node, input$cv_chosen_region)
+        }
+
+        # varNames <- names(variableNames)
+        print(varNames)
+        vars = "You chose: "
+        for (i in 1:length(varNames)) {
+            v = varNames[i]
+            vars = paste0(vars, v, "; ", sep = "", collapse = NULL)
+        }
+        showModal(
+            modalDialog(
+                title = "Loaded Variables",
+                sprintf(vars),
+                easyClose = FALSE,
+                footer = tagList(
+                    modalButton("Cancel"),
+                    actionButton("cv_continue", "Continue")
+                )
+            )
+        )
+        print(cv_contrast$groups[1])
+        enable("cv_variable_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_variable_check",
+                             value = TRUE)
+    })
+
+    cv_raw_sample_dfm <- reactiveValues()
+
+    # clicking the modal "Continue Button"
+    observeEvent(input$cv_continue, {
+        matfile <- input$cv_file_data$datapath
+        matfilenoext <-
+            tools::file_path_sans_ext(input$cv_file_data$name)
+        dir.create(file.path(tempdir(), '/OUTPUT'), showWarnings = FALSE)
+        dir.create(file.path(tempdir(), '/OUTPUT', 'CV_ONLY'), showWarnings = FALSE)
+
+        if (cv_xt == "csv") {
+            samplesvar <- colnames(cv_training())[input$cv_variables_csv_rows_selected[1]]
+            groupvar <- colnames(cv_training())[input$cv_variables_csv_rows_selected[2]]
+        } else if (cv_xt == "mat") {
+            annotfile <- input$cv_file_annotations$datapath
+            samplesvar <- input$cv_chosen_sample
+            groupvar <- input$cv_chosen_group
+        }
+
+        outdir <-
+            paste0(tempdir(), '/OUTPUT/CV_ONLY')
+
+        if (cv_xt == "csv") {
+            print("2D file")
+            proc_data <- inputDatProcess2d(
+                c(
+                    "y",
+                    "d",
+                    "c",
+                    "a",
+                    "s",
+                    matfile,
+                    matfilenoext,
+                    samplesvar,
+                    groupvar,
+                    outdir
+                )
+            )
+        } else if (cv_xt == "mat") {
+            proc_data <- inputDatProcess(
+                c(
+                    "y",
+                    "d",
+                    "c",
+                    "a",
+                    "s",
+                    matfile,
+                    matfilenoext,
+                    annotfile,
+                    samplesvar,
+                    groupvar,
+                    outdir
+                )
+            )
+
+        }
+
+
+        raw_sample_dfm$cv_raw_sample_dfm <- proc_data[1]
+        raw_sample_dfm$cv_raw_sample_dfm_wo_uni <- proc_data[2]
+        removeModal()
+
+        enable("cv_inputdata_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_inputdata_check",
+                             value = TRUE)
+    })
+
+    # upload configurations from file
+    cv_uploaded_configs <- reactive({
+        req(input$cv_up_configs)
+        configs <- getConfigsFromFile(input$cv_up_configs$datapath)
+
+        if (length(configs) == 4) {
+            output$cv_result <-
+                renderText(paste0("missing variables: ", configs[4][[1]]))
+            shinyalert(
+                title = "Missing Variables, Choose from dialog",
+                type = "warning",
+                text = sprintf(configs[4][[1]])
+            )
+        }
+        return(configs)
+    })
+
+
+    observeEvent(input$cv_up_configs, {
+        req(input$cv_up_configs)
+        configs <-
+            cv_uploaded_configs()[1][[1]]   #column 1 is key/value pair, column 2 is values, column 3 is variable names
+        configFileToUI(configs, session)
+        # updateTextInput(session=session, inputId = "htmap_textsize_col", value = configs[2])
+        # print(configs[2])
+    })
+
+    # Univariate button
+    observeEvent(input$cv_univariate, {
+        if(cv_xt == "mat") {
+            req(input$cv_file_data, input$cv_file_annotations, input$cv_file_node)}
+        else if (cv_xt == "csv") { req(input$cv_file_data)}
+
+        do.call(file.remove, list(list.files(
+            file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'UNIVARIATE'),
+            full.names = TRUE, recursive = TRUE
+        )))
+
+        matfilenoext <-
+            tools::file_path_sans_ext(input$cv_file_data$name)
+        dat_file <-
+            paste0(tempdir(), "/OUTPUT/CV_ONLY/", matfilenoext, "_2D.csv")
+
+        nodefile <- input$cv_file_node$datapath
+        dir.create(file.path(tempdir(), 'OUTPUT'), showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'UNIVARIATE'),
+                   showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'UNIVARIATE', 'PNGFILES'),
+                   showWarnings = FALSE)
+        outdir <-
+            file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'UNIVARIATE')
+        # configs <- uploaded_configs()[2][[1]]
+        print(cv_contrast$groups)
+        contrast <- cv_contrast$groups
+        node_id_var <- input$cv_chosen_node
+        region_name_var <- input$cv_chosen_region
+
+        # getting values from input fields into an args[] fromat
+        inputArgs <- univariateConfigs(inputConfigs())
+        inputArgs[6] <- dat_file
+        inputArgs[7] <- matfilenoext
+        inputArgs[9] <- outdir
+        inputArgs[38] <- contrast
+
+        if(cv_xt == "mat"){
+            inputArgs[8] <- nodefile
+            inputArgs[61] <- node_id_var
+            inputArgs[62] <- region_name_var
+        }
+
+        show_modal_spinner(text = "Processing...")
+        withConsoleRedirect("cv_console", {
+            if(cv_xt == "mat"){
+                univariate(inputArgs)
+            } else if (cv_xt == "csv") {
+                suppressWarnings(univariate_2D(inputArgs))
+
+            }
+
+        })
+        remove_modal_spinner()
+        setwd(tempdir())
+
+        enable("cv_univariate_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_univariate_check",
+                             value = TRUE)
+
+        # converting PDF results to PNGs to display in renderImage()
+        if (file.exists(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'UNIVARIATE', 'Rplots.pdf'))){
+            print("Rplots.pdf exists!, deleting now")
+        } else {
+            print("Rplots.pdf does not exist!")
+        }
+        pdf.list <-
+            list.files(path = file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'UNIVARIATE'),
+                       pattern = ".pdf$", full.names=TRUE)
+        
+        lapply(
+            pdf.list,
+            FUN = function(files) {
+                if (basename(files) == "Rplots.pdf") {
+                    NULL
+                } else {
+                    pdf_convert(
+                        files,
+                        format = "png",
+                        filenames = paste0(
+                            dirname(files),
+                            "/PNGFILES/" ,
+                            tools::file_path_sans_ext(basename(files)),
+                            ".png"
+                        )
+                    )
+                }
+            }
+        )
+
+        # #updating the Select Input with the png filenames
+        filenames <-
+            list.files(
+                path = normalizePath(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'UNIVARIATE', 'PNGFILES')),
+                pattern = ".png$",
+                full.names = FALSE
+            )
+        print(filenames)
+        updateSelectInput(session = session,
+                          inputId = "cv_select_uni_plot",
+                          choices = filenames)
+
+    })
+    
+    # SVM button
+    observeEvent(input$cv_svm, {
+        if(cv_xt == "mat") {req(input$cv_file_data, input$cv_file_annotations, input$cv_file_node)}
+        else if (cv_xt == "csv") { req(input$cv_file_data)}
+
+        matfilenoext <-
+            tools::file_path_sans_ext(input$cv_file_data$name)
+
+        dat_file <- switch(
+            input$cv_modeltype,
+            cv_noneset = paste0(tempdir(), "/OUTPUT/CV_ONLY/", matfilenoext, "_2D_wo_uni.csv"),
+            cv_kset = paste0(tempdir(), "/OUTPUT/CV_ONLY/UNIVARIATE/", matfilenoext, "_ml.csv"),
+            cv_uset = paste0(tempdir(), "/OUTPUT/CV_ONLY/", matfilenoext, "_2D_wo_uni.csv")
+        )
+
+        cvuni <- switch(
+            input$cv_modeltype,
+            cv_noneset = FALSE,
+            cv_kset = FALSE,
+            cv_uset = TRUE
+        )
+
+        do.call(file.remove, list(list.files(
+            file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'ML_SVM'),
+            full.names = TRUE, recursive = TRUE
+        )))
+
+        dir.create(file.path(tempdir(), 'OUTPUT'), showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'ML_SVM'),
+                   showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'ML_SVM', 'PNGFILES'),
+                   showWarnings = FALSE)
+        outdir <-
+            file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'ML_SVM')
+
+        nodefile <- input$cv_file_node$datapath
+        # configs <- uploaded_configs()[2][[1]]
+        contrast <- cv_contrast$groups[1]
+        psetting = FALSE
+        if (isTruthy(input$cv_cores)){
+            paste0("parallel computing", input$cv_cores)
+            psetting <- TRUE
+            cores <- input$cv_cores
+        } else {
+            print("no parallel computing")
+        }
+
+
+        # getting values from input fields into an args[] fromat
+        inputArgs <- ml_svmConfigs(inputConfigs())
+        inputArgs[6] <- dat_file
+        inputArgs[7] <- matfilenoext
+        inputArgs[8] <- outdir
+        inputArgs[9] <- psetting
+        inputArgs[10] <- cores
+        inputArgs[62] <- cvuni
+        inputArgs[64] <- contrast
+
+        show_modal_spinner(text = "Running classifier...")
+        withConsoleRedirect("cv_console", {
+            cv_ml_svm(inputArgs)
+        })
+
+        print("PLSDA ANALYSIS")
+        plsdainputArgs <- plsdaConfigs(inputConfigs())
+        plsdainputArgs[6] <- paste0(outdir, '/', 'cv_only_', matfilenoext, '_final_svm_model.Rdata')
+        plsdainputArgs[7] <- matfilenoext
+        plsdainputArgs[8] <- outdir
+        plsdainputArgs[9] <- psetting
+        plsdainputArgs[10] <- cores
+
+        cv_plsda_val_svm(plsdainputArgs)
+
+        remove_modal_spinner()
+
+
+        # converting PDF results to PNGs to display in renderImage()
+        if (file.exists(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'ML_SVM', 'Rplots.pdf'))){
+            print("Rplots.pdf exists!, deleting now")
+        } else {
+            print("Rplots.pdf does not exist!")
+        }
+        pdf.list <-
+            list.files(path = file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'ML_SVM'),
+                       pattern = ".pdf$", full.names = TRUE)
+        
+        lapply(
+            pdf.list,
+            FUN = function(files) {
+                if (basename(files) == "Rplots.pdf") {
+                    NULL
+                } else {
+                    pdf_convert(
+                        files,
+                        format = "png",
+                        filenames = paste0(
+                            dirname(files),
+                            "/PNGFILES/" ,
+                            tools::file_path_sans_ext(basename(files)),
+                            ".png"
+                        )
+                    )
+                }
+            }
+        )
+
+        #updating the Select Input with the png filenames
+        files <-
+            list.files(
+                path = file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'ML_SVM', 'PNGFILES'),
+                pattern = ".png$",
+                full.names = FALSE
+            )
+        print(files)
+        updateSelectInput(session = session,
+                          inputId = "cv_select_svm_plot",
+                          choices = files)
+
+        enable("cv_svm_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_svm_check",
+                             value = TRUE)
+
+
+    })
+
+    # viewing plots
+    output$cv_uni_plots <- renderImage({
+        req(input$cv_univariate)
+        setwd(tempdir())
+        suppressWarnings(list(
+            src = normalizePath(file.path(
+                tempdir(),
+                'OUTPUT',
+                'CV_ONLY',
+                'UNIVARIATE',
+                'PNGFILES',
+                input$cv_select_uni_plot
+            )),
+            alt = "Univariate plots",
+            width = 400,
+            height = 400
+        ))
+
+    }, deleteFile = FALSE)
+
+    output$cv_svm_plots <- renderImage({
+        req(input$cv_svm)
+        list(
+            src = file.path(
+                tempdir(),
+                'OUTPUT',
+                'CV_ONLY',
+                'ML_SVM',
+                'PNGFILES',
+                input$cv_select_svm_plot
+            ),
+            alt = "SVM plots",
+            width = 400,
+            height = 400
+        )
+
+    }, deleteFile = FALSE)
+
+
+    output$cv_report <- downloadHandler(
+
+        filename = function() {
+            paste("report-", Sys.Date(), ".pdf", sep="")
+        },
+        content = function(file) {
+            setwd('/srv/shiny-server/')
+            tempReport <- file.path(tempdir(), 'results.Rmd')
+            file.copy(file.path('srv', 'shiny-server', 'results.Rmd'), tempReport, overwrite = TRUE)
+            rmarkdown::render(input = 'results.Rmd')
+            # tinytex::pdflatex('results.tex')
+            file.copy(file.path('results.pdf'), file)
+        }
+
+    )
+
+    output$cv_allfiles <- downloadHandler(
+
+        filename = function() {
+            paste("allfiles-", Sys.Date(), ".zip", sep="")
+        },
+        content = function(file) {
+            tempzip <- file.path(tempdir(), "results.zip")
+            zipr(tempzip, file.path(tempdir(), 'OUTPUT'))
+            file.copy(tempzip, file)
+        }
+    )
+    
+    ################################### CV-ONLY Regression ANALYSIS #####################################
+    # checking and loading only the mat file
+    output$cv_reg_debug <-
+        renderText(paste0("Debug: ", input$cv_reg_cpu_cluster))
+    
+    cv_reg_training <- reactive({
+        req(input$cv_reg_file_data)
+        cv_reg_xt <<- tools::file_ext(input$cv_reg_file_data$datapath)
+        print(cv_reg_xt)
+        dater = matrix(list(),
+                       nrow = 1,
+                       ncol = length(input$cv_reg_file_data$name))
+        if (cv_reg_xt == "mat") {
+            df <- readMat(input$cv_reg_file_data$datapath)
+            df <- df[[1]]
+            dater[[1, 1]] <- df
+            # return(dater)
+        } else if (cv_reg_xt == "csv") {
+            df <- read.csv(input$cv_reg_file_data$datapath,
+                           header = TRUE,
+                           sep = ",")
+            # return(df)
+            dater[[1, 1]] <- df
+        }
+        return(dater)
+    })
+    
+    cv_reg_annotations <- reactive({
+        cv_reg_xt <<- tools::file_ext(input$cv_reg_file_data$datapath)
+        if (cv_reg_xt == "csv"){
+            req(input$cv_reg_file_data)
+            print("annotations 2D data!!")
+            dater <- data.frame(cv_training()[2])
+            return(dater)
+        }
+        else {
+            req(input$cv_reg_file_annotations)
+            dater = matrix(list(),
+                           nrow = 1,
+                           ncol = 1)
+            df <- read.csv(input$cv_reg_file_annotations$datapath,
+                           header = TRUE,
+                           sep = ",")
+            dater[[1, 1]] <- df
+            return(dater)
+        }
+        
+    })
+    
+    cv_reg_node <- reactive({
+        req(cv_reg_xt)
+        if(cv_reg_xt == "csv"){
+            print("node 2D data!!")
+        }
+        else{
+            req(input$cv_reg_file_node)
+            dater = matrix(list(),
+                           nrow = 1,
+                           ncol = 1)
+            df <- read.csv(input$cv_reg_file_node$datapath,
+                           header = TRUE,
+                           sep = ",")
+            dater[[1, 1]] <- df
+            return(dater)
+        }
+        
+    })
+    
+    output$cv_reg_training <- DT::renderDataTable({
+        cv_reg_xt <<- tools::file_ext(input$cv_reg_file_data$datapath)
+        req(input$cv_reg_file_data)
+        if (cv_reg_xt == "csv"){
+            d <- cv_reg_training()[[1, 1]]
+        } else if (cv_reg_xt == "mat"){
+            d <- cv_reg_training()[[1, 1]][, , 1]
+        }
+        datatable(
+            d,
+            colnames = NULL,
+            options = list(
+                autoWidth = TRUE,
+                lengthChange = FALSE,
+                scrollX = TRUE,
+                scrollY = TRUE,
+                searching = FALSE
+            ),
+            selection = list(target = 'column')
+        ) 
+        # %>% formatRound(c(1:90), 3)
+    })
+    
+    output$cv_reg_annotation <- DT::renderDataTable({
+        req(cv_reg_xt)
+        datatable(
+            if(cv_reg_xt == "csv"){
+                cv_reg_annotations()
+            } else {
+                cv_reg_annotations()[[1, 1]]
+            },
+            options = list(
+                autowidth = TRUE,
+                pageLength = 10,
+                lengthChange = FALSE,
+                searching = FALSE
+            )
+        )
+    })
+    
+    output$cv_reg_node <- DT::renderDataTable({
+        req(cv_reg_xt)
+        datatable(
+            if(cv_reg_xt == "csv"){
+                
+            } else {
+                cv_reg_node()[[1, 1]]
+            },
+            options = list(
+                autowidth = TRUE,
+                pageLength = 10,
+                lengthChange = FALSE,
+                searching = FALSE
+            )
+        )
+    })
+    
+    # rendering the drag and drop with variable names
+    
+    output$cv_reg_variables_csv <- DT::renderDataTable({
+        d <- cv_reg_training()[[1, 1]]
+        
+        labs <- c(colnames(d))
+        datatable(
+            matrix(labs),
+            options = list(
+                autowidth = TRUE,
+                pageLength = 10,
+                lengthChange = FALSE,
+                searching = FALSE
+            )
+        )
+        
+    })
+    
+    output$cv_reg_samplevar <- renderText({
+        d <- cv_reg_training()[[1, 1]]
+        paste("Selected Sample Variable: ", colnames(d)[input$cv_reg_variables_csv_rows_selected[1]])
+    })
+    output$reg_groupvar <- renderText({
+        d <- reg_training()[[1, 1]]
+        paste("Selected Group Variable: ", colnames(d)[input$cv_reg_variables_csv_rows_selected[2]])
+    })
+    
+    output$cv_reg_variables <- renderUI({
+        req(input$cv_reg_file_data)
+        cv_reg_xt <<- tools::file_ext(input$cv_reg_file_data$datapath)
+        if (cv_reg_xt == "csv"){
+            
+            box(
+                title = "File Variables from column names",
+                status = "primary",
+                width = 12,
+                collapsible = TRUE,
+                solidHeader = TRUE,
+                dataTableOutput("cv_reg_variables_csv"),
+                verbatimTextOutput("cv_reg_samplevar"),
+                verbatimTextOutput("cv_reg_groupvar"),
+                actionButton(inputId = "cv_reg_choose_vars", label = "Confirm Variables")
+            )
+            
+            # d <- read.csv(input$reg_file_data$datapath,
+            #               header = TRUE,
+            #               sep = ",")
+            # labs <- c(colnames(d[1:2]))
+            # # print(colnames(d))
+            # useShinyjs()
+            # tagList(
+            #     box(
+            #         title = "File Variables",
+            #         status = "primary",
+            #         width = 12,
+            #         collapsible = TRUE,
+            #         solidHeader = TRUE,
+            # 
+            #         div ( style = 'overflow-y:scroll; max-height: 382px;',
+            #               fluidRow(
+            #                   class = "panel-body",
+            #                   column(
+            #                       width = 4,
+            #                       tags$div(
+            #                           class = "panel panel-default",
+            #                           tags$div(class = "panel-heading",
+            #                                    "File Variables"),
+            #                           tags$div(class = "panel-body av_vars_body",
+            #                                    id = "reg_availablevars",
+            #                                    icon_list(labs)),
+            #                           tags$style(HTML('
+            #                             '))
+            #                       )
+            #                   ),
+            #                   column(
+            #                       width = 4,
+            #                       tags$div(
+            #                           class = "panel panel-default",
+            #                           tags$div(class = "panel-heading",
+            #                                    "Sample"),
+            #                           tags$div(class = "panel-body",
+            #                                    id = "reg_chosen_sample")
+            #                       ),
+            #                       tags$div(
+            #                           class = "panel panel-default",
+            #                           tags$div(class = "panel-heading",
+            #                                    "Group"),
+            #                           tags$div(class = "panel-body",
+            #                                    id = "reg_chosen_group")
+            #                       )
+            #                   ),
+            #                   # column(
+            #                   #     width = 4,
+            #                   #     tags$div(
+            #                   #         class = "panel panel-default",
+            #                   #         tags$div(class = "panel-heading",
+            #                   #                  "Node ID"),
+            #                   #         tags$div(class = "panel-body",
+            #                   #                  id = "chosen_node")
+            #                   #     ),
+            #                   #     tags$div(
+            #                   #         class = "panel panel-default",
+            #                   #         tags$div(class = "panel-heading",
+            #                   #                  "Region"),
+            #                   #         tags$div(class = "panel-body",
+            #                   #                  id = "chosen_region")
+            #                   #     )
+            #                   # ),
+            #                   #################### sortable code for drag and drop
+            #                   sortable_js(
+            #                       "reg_availablevars",
+            #                       options = sortable_options(
+            #                           group = list(
+            #                               pull = TRUE,
+            #                               name = "reg_allvars",
+            #                               put = TRUE
+            #                           ),
+            #                           onSort = sortable_js_capture_input("sort_vars")
+            #                       )
+            # 
+            #                   ),
+            #                   sortable_js(
+            #                       "reg_chosen_sample",
+            #                       options = sortable_options(
+            #                           group = list(
+            #                               group = "reg_allvars",
+            #                               put = htmlwidgets::JS(
+            #                                   'function (to) { return to.el.children.length < 1; }'
+            #                               ),
+            #                               pull = htmlwidgets::JS(
+            #                                   'function (to) { document.getElementById("reg_chosen_sample").style.backgroundColor = "white"; }'
+            #                               )
+            #                           ),
+            #                           swapClass = "sortable-swap-highlight",
+            #                           onSort = sortable_js_capture_input("reg_chosen_sample")
+            #                       )
+            #                   ),
+            #                   sortable_js(
+            #                       "reg_chosen_group",
+            #                       options = sortable_options(
+            #                           group = list(
+            #                               group = "reg_allvars",
+            #                               put = htmlwidgets::JS(
+            #                                   'function (to) { return to.el.children.length < 1; }'
+            #                               ),
+            #                               pull = htmlwidgets::JS(
+            #                                   'function (to) { document.getElementById("reg_chosen_group").style.backgroundColor = "white"; }'
+            #                               )
+            #                           ),
+            #                           swapClass = "sortable-swap-highlight",
+            #                           onSort = sortable_js_capture_input("reg_chosen_group")
+            #                           # onMove = htmlwidgets::JS('document.getElementById("chosen_group").style.backgroundColor = "lightblue";')
+            #                       )
+            #                   )
+            #                   # sortable_js(
+            #                   #     "chosen_node",
+            #                   #     options = sortable_options(
+            #                   #         group = list(
+            #                   #             group = "allvars",
+            #                   #             put = htmlwidgets::JS(
+            #                   #                 'function (to) { return to.el.children.length < 1; }'
+            #                   #             ),
+            #                   #             pull = htmlwidgets::JS(
+            #                   #                 'function (to) { document.getElementById("chosen_node").style.backgroundColor = "white"; }'
+            #                   #             )
+            #                   #         ),
+            #                   #         swapClass = "sortable-swap-highlight",
+            #                   #         onSort = sortable_js_capture_input("chosen_node")
+            #                   #     )
+            #                   # ),
+            #                   # sortable_js(
+            #                   #     "chosen_region",
+            #                   #     options = sortable_options(
+            #                   #         group = list(
+            #                   #             group = "allvars",
+            #                   #             put = htmlwidgets::JS(
+            #                   #                 'function (to) { return to.el.children.length < 1; }'
+            #                   #             ),
+            #                   #             pull = htmlwidgets::JS(
+            #                   #                 'function (to) { document.getElementById("chosen_region").style.backgroundColor = "white"; }'
+            #                   #             )
+            #                   #         ),
+            #                   #         swapClass = "sortable-swap-highlight",
+            #                   #         onSort = sortable_js_capture_input("chosen_region")
+            #                   #     )
+            #                   # )
+            #               ),
+            #               actionButton(inputId = "reg_choose_vars",
+            #                            label = "Confirm Variables"),
+            #               # tags$head(
+            #               #     tags$style(
+            #               #         "#box-body{overflow-y:scroll; max-height: 250px; background: ghostwhite;}"
+            #               #     )
+            #               # )
+            #         )
+            #     )
+            # )
+            
+        } else if(cv_reg_xt == "mat") {
+            req(input$cv_reg_file_annotations, input$cv_reg_file_node)
+            labs <-
+                c(colnames(cv_reg_annotations()[[1, 1]]), colnames(cv_reg_node()[[1, 1]]))
+            print(labs)
+            useShinyjs()
+            tagList(
+                box(
+                    title = "File Variables",
+                    status = "primary",
+                    width = 12,
+                    collapsible = TRUE,
+                    solidHeader = TRUE,
+                    
+                    fluidRow(
+                        class = "panel-body",
+                        column(
+                            width = 4,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "File Variables"),
+                                tags$div(class = "panel-body av_vars_body",
+                                         id = "cv_reg_availablevars",
+                                         icon_list(labs)),
+                                tags$style(HTML('
+                                '))
+                            )
+                        ),
+                        column(
+                            width = 4,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Sample"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_reg_chosen_sample")
+                            ),
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Group"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_reg_chosen_group")
+                            ),
+                        ),
+                        column(
+                            width = 4,
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Node ID"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_reg_chosen_node")
+                            ),
+                            tags$div(
+                                class = "panel panel-default",
+                                tags$div(class = "panel-heading",
+                                         "Region"),
+                                tags$div(class = "panel-body",
+                                         id = "cv_reg_chosen_region")
+                            )
+                        ),
+                        #################### sortable code for drag and drop #####################
+                        sortable_js(
+                            "cv_reg_availablevars",
+                            options = sortable_options(
+                                group = list(
+                                    pull = TRUE,
+                                    name = "cv_reg_allvars",
+                                    put = TRUE
+                                ),
+                                onSort = sortable_js_capture_input("cv_reg_sort_vars")
+                            )
+                            
+                        ),
+                        sortable_js(
+                            "cv_reg_chosen_sample",
+                            options = sortable_options(
+                                group = list(
+                                    group = "cv_reg_allvars",
+                                    put = htmlwidgets::JS(
+                                        'function (to) { return to.el.children.length < 1; }'
+                                    ),
+                                    pull = htmlwidgets::JS(
+                                        'function (to) { document.getElementById("cv_reg_chosen_sample").style.backgroundColor = "white"; }'
+                                    )
+                                ),
+                                swapClass = "sortable-swap-highlight",
+                                onSort = sortable_js_capture_input("cv_reg_chosen_sample")
+                            )
+                        ),
+                        sortable_js(
+                            "cv_reg_chosen_group",
+                            options = sortable_options(
+                                group = list(
+                                    group = "cv_reg_allvars",
+                                    put = htmlwidgets::JS(
+                                        'function (to) { return to.el.children.length < 1; }'
+                                    ),
+                                    pull = htmlwidgets::JS(
+                                        'function (to) { document.getElementById("cv_reg_chosen_group").style.backgroundColor = "white"; }'
+                                    )
+                                ),
+                                swapClass = "sortable-swap-highlight",
+                                onSort = sortable_js_capture_input("cv_reg_chosen_group")
+                                # onMove = htmlwidgets::JS('document.getElementById("chosen_group").style.backgroundColor = "lightblue";')
+                            )
+                        ),
+                        sortable_js(
+                            "cv_reg_chosen_node",
+                            options = sortable_options(
+                                group = list(
+                                    group = "cv_reg_allvars",
+                                    put = htmlwidgets::JS(
+                                        'function (to) { return to.el.children.length < 1; }'
+                                    ),
+                                    pull = htmlwidgets::JS(
+                                        'function (to) { document.getElementById("cv_reg_chosen_node").style.backgroundColor = "white"; }'
+                                    )
+                                ),
+                                swapClass = "sortable-swap-highlight",
+                                onSort = sortable_js_capture_input("cv_reg_chosen_node")
+                            )
+                        ),
+                        sortable_js(
+                            "cv_reg_chosen_region",
+                            options = sortable_options(
+                                group = list(
+                                    group = "cv_reg_allvars",
+                                    put = htmlwidgets::JS(
+                                        'function (to) { return to.el.children.length < 1; }'
+                                    ),
+                                    pull = htmlwidgets::JS(
+                                        'function (to) { document.getElementById("cv_reg_chosen_region").style.backgroundColor = "white"; }'
+                                    )
+                                ),
+                                swapClass = "sortable-swap-highlight",
+                                onSort = sortable_js_capture_input("cv_reg_chosen_region")
+                            )
+                        )
+                    ),
+                    actionButton(inputId = "cv_reg_choose_vars",
+                                 label = "Confirm Variables")
+                )
+            )
+        }
+    })
+    
+    # output$reg_groups <- renderUI({
+    #     req(input$reg_file_data)
+    #     reg_xt <<- tools::file_ext(input$reg_file_data$datapath)
+    #     
+    #     if(reg_xt == "csv"){
+    #         groups <- data.frame(reg_annotations())
+    #         groups <- count(groups$group)
+    #         groupnames <- unique(groups$x)
+    #         groupcount <- groups$freq
+    #         numgroups <- length(groups)
+    #         useShinyjs()
+    #         tagList(
+    #             box(
+    #                 title = "Contrast variables",
+    #                 status = "primary",
+    #                 width = 12,
+    #                 collapsible = TRUE,
+    #                 solidHeader = TRUE,
+    #                 fluidRow(
+    #                     class = "panel-body",
+    #                     column(
+    #                         width = 3,
+    #                         tags$div(
+    #                             class = "panel panel-default",
+    #                             tags$div(class = "panel-heading",
+    #                                      "Group Variables"),
+    #                             tags$div(
+    #                                 class = "panel-body",
+    #                                 id = "reg_availablegroups",
+    #                                 icon_list(groupnames)
+    #                             ),
+    #                             tags$style(HTML('
+    #                             '))
+    #                         )
+    #                     ),
+    #                     column(
+    #                         width = 3,
+    #                         tags$div(
+    #                             id = "reg_contrastgroup1",
+    #                             class = "panel panel-default contrast1",
+    #                             tags$div(class = "panel-heading",
+    #                                      "Group 1"),
+    #                             tags$div(class = "panel-body",
+    #                                      id = "reg_contrast1")
+    #                         )
+    #                     ),
+    #                     column(width = 1,
+    #                            tags$div(class = "h1",
+    #                                     "VS.")),
+    #                     column(
+    #                         width = 3,
+    #                         tags$div(
+    #                             class = "panel panel-default",
+    #                             tags$div(class = "panel-heading",
+    #                                      "Group 2"),
+    #                             tags$div(class = "panel-body",
+    #                                      id = "reg_contrast2")
+    #                         )
+    #                     ),
+    #                     
+    #                     column(
+    #                         width = 2,
+    #                         tags$div(
+    #                             class = "panel panel-default",
+    #                             tags$div(class = "panel-heading",
+    #                                      icon("trash"),
+    #                                      "Bin item"),
+    #                             tags$div(class = "panel-body",
+    #                                      id = "reg_trashbin")
+    #                         )
+    #                     )
+    #                 ),
+    #                 sortable_js(
+    #                     "reg_availablegroups",
+    #                     options = sortable_options(
+    #                         group = list(
+    #                             pull = "clone",
+    #                             name = "reg_allsorts",
+    #                             put = FALSE
+    #                         ),
+    #                         onSort = sortable_js_capture_input("reg_sort_vars")
+    #                     )
+    #                 ),
+    #                 sortable_js(
+    #                     "reg_contrast1",
+    #                     options = sortable_options(
+    #                         group = list(
+    #                             group = "reg_allsorts",
+    #                             put = TRUE,
+    #                             pull = TRUE
+    #                         ),
+    #                         swapClass = "sortable-swap-highlight",
+    #                         onSort = sortable_js_capture_input("reg_contrast_group1")
+    #                         # onSort = htmlwidgets::JS('function (to) { var count = contrast1.children.length; console.log(count);  var c = contrast1.children;
+    #                         #                      var colors = ["khaki", "indianred", "steelblue", "seagreen", "plum"]
+    #                         # 
+    #                         #                      if (count >= 1){
+    #                         #                      for (i = 0; i < count; i++){
+    #                         #                      if (i%5 == 0) {
+    #                         #                      var j = 0;
+    #                         #                      }
+    #                         #                      var color = colors[j]
+    #                         #                      c[i].style.backgroundColor = color;
+    #                         #                      j += 1;
+    #                         #                      var text = c[i].innerText.match(/[a-zA-Z]+/g);
+    #                         #                      c[i].innerText = i.toString().concat(". ", text);
+    #                         #                      c[i].style.fontWeight = "bold";
+    #                         #                      }
+    #                         #                      console.log("yeeeeeehehehrerhq;lrehq;werh");
+    #                         # 
+    #                         #                      }}'),
+    #                         # onAdd = sortable_js_capture_input("contrast_group1")
+    #                     )
+    #                     
+    #                 ),
+    #                 sortable_js(
+    #                     "reg_contrast2",
+    #                     options = sortable_options(
+    #                         group = list(
+    #                             group = "reg_allsorts",
+    #                             put = TRUE,
+    #                             pull = TRUE
+    #                         ),
+    #                         swapClass = "sortable-swap-highlight",
+    #                         onSort = sortable_js_capture_input("reg_contrast_group2")
+    #                         # onSort = htmlwidgets::JS('function (to) { var count = contrast2.children.length; console.log(count);  var c = contrast2.children;
+    #                         #                      var colors = ["khaki", "indianred", "steelblue", "seagreen", "plum"]
+    #                         # 
+    #                         #                      if (count >= 1){
+    #                         #                      for (i = 0; i < count; i++){
+    #                         #                      if (i%5 == 0) {
+    #                         #                      var j = 0;
+    #                         #                      }
+    #                         #                      var color = colors[j]
+    #                         #                      c[i].style.backgroundColor = color;
+    #                         #                      j += 1;
+    #                         #                      var text = c[i].innerText.match(/[a-zA-Z]+/g);
+    #                         #                      c[i].innerText = i.toString().concat(". ", text);
+    #                         #                      c[i].style.fontWeight = "bold";
+    #                         # 
+    #                         #                      }
+    #                         #                      console.log("yeeeeeehehehrerhq;lrehq;werh");
+    #                         # 
+    #                         #                      }}'),
+    #                         # onAdd = sortable_js_capture_input("contrast_group2")
+    #                     )
+    #                     
+    #                 ),
+    #                 sortable_js(
+    #                     "reg_trashbin",
+    #                     options = sortable_options(
+    #                         group = list(
+    #                             group = "reg_allsorts",
+    #                             put = TRUE,
+    #                             pull = TRUE
+    #                         ),
+    #                         onAdd = htmlwidgets::JS("function (evt) { this.el.removeChild(evt.item); }")
+    #                     )
+    #                 ),
+    #                 actionButton(inputId = "reg_confirmcontrast", label = "Confirm")
+    #             )
+    #         )
+    #         
+    #     } else if (reg_xt == "mat") {
+    #     
+    #     req(input$reg_file_annotations, input$reg_file_node)
+    #     groups <- data.frame(reg_annotations()[[1, 1]])
+    #     groups <- count(groups$group)
+    #     groupnames <- unique(groups$x)
+    #     groupcount <- groups$freq
+    #     numgroups <- length(groups)
+    #     useShinyjs()
+    #     tagList(
+    #         box(
+    #             title = "Contrast variables",
+    #             status = "primary",
+    #             width = 12,
+    #             collapsible = TRUE,
+    #             solidHeader = TRUE,
+    #             fluidRow(
+    #                 class = "panel-body",
+    #                 column(
+    #                     width = 3,
+    #                     tags$div(
+    #                         class = "panel panel-default",
+    #                         tags$div(class = "panel-heading",
+    #                                  "Group Variables"),
+    #                         tags$div(
+    #                             class = "panel-body",
+    #                             id = "reg_availablegroups",
+    #                             icon_list(groupnames)
+    #                         ),
+    #                         tags$style(HTML('
+    #                             '))
+    #                     )
+    #                 ),
+    #                 column(
+    #                     width = 3,
+    #                     tags$div(
+    #                         id = "reg_contrastgroup1",
+    #                         class = "panel panel-default contrast1",
+    #                         tags$div(class = "panel-heading",
+    #                                  "Group 1"),
+    #                         tags$div(class = "panel-body",
+    #                                  id = "reg_contrast1"),
+    #                     )
+    #                 ),
+    #                 column(width = 1,
+    #                        tags$div(class = "h1",
+    #                                 "VS.")),
+    #                 column(
+    #                     width = 3,
+    #                     tags$div(
+    #                         class = "panel panel-default",
+    #                         tags$div(class = "panel-heading",
+    #                                  "Group 2"),
+    #                         tags$div(class = "panel-body",
+    #                                  id = "reg_contrast2")
+    #                     )
+    #                 ),
+    # 
+    #                 column(
+    #                     width = 2,
+    #                     tags$div(
+    #                         class = "panel panel-default",
+    #                         tags$div(class = "panel-heading",
+    #                                  icon("trash"),
+    #                                  "Bin item"),
+    #                         tags$div(class = "panel-body",
+    #                                  id = "reg_trashbin")
+    #                     )
+    #                 )
+    #             ),
+    #             sortable_js(
+    #                 "reg_availablegroups",
+    #                 options = sortable_options(
+    #                     group = list(
+    #                         pull = "clone",
+    #                         name = "reg_allsorts",
+    #                         put = FALSE
+    #                     ),
+    #                     onSort = sortable_js_capture_input("reg_sort_vars")
+    #                 )
+    #             ),
+    #             sortable_js(
+    #                 "reg_contrast1",
+    #                 options = sortable_options(
+    #                     group = list(
+    #                         group = "reg_allsorts",
+    #                         put = TRUE,
+    #                         pull = TRUE
+    #                     ),
+    #                     swapClass = "sortable-swap-highlight",
+    #                     onSort = sortable_js_capture_input("reg_contrast_group1")
+    #                     # onSort = htmlwidgets::JS('function (to) { var count = reg_contrast1.children.length; console.log(count);  var c = reg_contrast1.children;
+    #                     #                          var colors = ["yellow", "indianred", "steelblue", "green", "magenta"]
+    #                     #
+    #                     #                          if (count >= 1){
+    #                     #                          for (i = 0; i < count; i++){
+    #                     #                          if (i%5 == 0) {
+    #                     #                          var j = 0;
+    #                     #                          }
+    #                     #                          var color = colors[j]
+    #                     #                          c[i].style.backgroundColor = color;
+    #                     #                          j += 1;
+    #                     #                          var text = c[i].innerText.match(/[a-zA-Z]+/g);
+    #                     #                          c[i].innerText = i.toString().concat(". ", text);
+    #                     #                          c[i].style.fontWeight = "bold";
+    #                     #                          }
+    #                     #                          console.log("yeeeeeehehehrerhq;lrehq;werh");
+    #                     #
+    #                     #                          }}')
+    #                 )
+    # 
+    #             ),
+    #             sortable_js(
+    #                 "reg_contrast2",
+    #                 options = sortable_options(
+    #                     group = list(
+    #                         group = "reg_allsorts",
+    #                         put = TRUE,
+    #                         pull = TRUE
+    #                     ),
+    #                     swapClass = "sortable-swap-highlight",
+    #                     onSort = sortable_js_capture_input("reg_contrast_group2")
+    #                     # onSort = htmlwidgets::JS('function (to) { var count = reg_contrast2.children.length; console.log(count);  var c = reg_contrast2.children;
+    #                     #                          var colors = ["yellow", "indianred", "steelblue", "green", "magenta"]
+    #                     #
+    #                     #                          if (count >= 1){
+    #                     #                          for (i = 0; i < count; i++){
+    #                     #                          if (i%5 == 0) {
+    #                     #                          var j = 0;
+    #                     #                          }
+    #                     #                          var color = colors[j]
+    #                     #                          c[i].style.backgroundColor = color;
+    #                     #                          j += 1;
+    #                     #                          var text = c[i].innerText.match(/[a-zA-Z]+/g);
+    #                     #                          c[i].innerText = i.toString().concat(". ", text);
+    #                     #                          c[i].style.fontWeight = "bold";
+    #                     #                          }
+    #                     #                          console.log("yeeeeeehehehrerhq;lrehq;werh");
+    #                     #
+    #                     #                          }}')
+    #                 )
+    # 
+    #             ),
+    #             sortable_js(
+    #                 "reg_trashbin",
+    #                 options = sortable_options(
+    #                     group = list(
+    #                         group = "reg_allsorts",
+    #                         put = TRUE,
+    #                         pull = TRUE
+    #                     ),
+    #                     onAdd = htmlwidgets::JS("function (evt) { this.el.removeChild(evt.item); }")
+    #                 )
+    #             ),
+    #             actionButton(inputId = "reg_confirmcontrast", label = "Confirm")
+    #         )
+    #     )
+    #     }
+    #     
+    # })
+    
+    # reg_contrast <- reactiveValues()
+    
+    # observeEvent(input$reg_confirmcontrast, {
+    #     #check that they're the same length
+    #     contrast1 <- input$reg_contrast_group1
+    #     contrast2 <- input$reg_contrast_group2
+    #     output <- 0
+    #     if (length(contrast1) != length(contrast2)) {
+    #         shinyalert(
+    #             title = "Unequal groups!",
+    #             type = "warning",
+    #             text = paste(
+    #                 "Group 1:",
+    #                 length(contrast1),
+    #                 "items; Group 2:",
+    #                 length(contrast2),
+    #                 "items."
+    #             )
+    #         )
+    #     } else if (length(contrast1) == 0 | length(contrast2) == 0) {
+    #         shinyalert(
+    #             title = "No contrast variables chosen!",
+    #             type = "warning",
+    #             text = paste(
+    #                 "Please choose at least one contrast variable per group."
+    #             )
+    #         )
+    #     } else {
+    #         for (i in 1:length(contrast1)) {
+    #             output[i] <- paste0(contrast1[i], " - ", contrast2[i])
+    #         }
+    #         output <- paste(output, collapse = ',', sep = '')
+    #         reg_contrast$groups <- output
+    # 
+    #     }
+    #     enable("reg_contrast_check")
+    #     updatePrettyCheckbox(session = session,
+    #                          inputId = "reg_contrast_check",
+    #                          value = TRUE)
+    # 
+    # })
+    
+    observeEvent(input$cv_reg_choose_vars, {
+        print("WE ARE CHOOSING VARIABLES!!!")
+        print(cv_reg_xt)
+        print(colnames(cv_reg_training()[[1, 1]][input$cv_reg_variables_csv_rows_selected[1]]))
+        if(cv_reg_xt == "csv"){
+            print(cv_reg_xt)
+            varNames <- c(colnames(cv_reg_training()[[1, 1]])[input$cv_reg_variables_csv_rows_selected[1]], 
+                          colnames(cv_reg_training()[[1, 1]])[input$cv_reg_variables_csv_rows_selected[2]])
+            paste(varNames)
+        } else if(cv_reg_xt == "mat"){
+            varNames <- c(input$cv_reg_chosen_sample, input$cv_reg_chosen_group, input$cv_reg_chosen_node, input$cv_reg_chosen_region)
+        }
+        
+        print(varNames)
+        vars = "You chose: "
+        for (i in 1:length(varNames)) {
+            v = varNames[i]
+            vars = paste0(vars, v, "; ", sep = "", collapse = NULL)
+        }
+        showModal(
+            modalDialog(
+                title = "Loaded Variables",
+                sprintf(vars),
+                easyClose = FALSE,
+                footer = tagList(
+                    modalButton("Cancel"),
+                    actionButton("cv_reg_continue", "Continue")
+                )
+            )
+        )
+        # print(reg_contrast$groups)
+        enable("cv_reg_variable_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_reg_variable_check",
+                             value = TRUE)
+    })
+    
+    observeEvent(input$cv_reg_continue, {
+        matfile <- input$cv_reg_file_data$datapath
+        matfilenoext <-
+            tools::file_path_sans_ext(input$cv_reg_file_data$name)
+        dir.create(file.path(tempdir(), 'OUTPUT'), showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY'), showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION'), showWarnings = FALSE)
+        
+        if (cv_reg_xt == "csv"){
+            samplesvar <- colnames(cv_reg_training()[[1, 1]])[input$cv_reg_variables_csv_rows_selected[1]]
+            groupvar <- colnames(cv_reg_training()[[1, 1]])[input$cv_reg_variables_csv_rows_selected[2]]
+        } else if (cv_reg_xt == "mat"){
+            annotfile <- input$cv_reg_file_annotations$datapath
+            samplesvar <- input$cv_reg_chosen_sample
+            groupvar <- input$cv_reg_chosen_group
+        }
+        
+        
+        outdir <- paste0(tempdir(), '/OUTPUT/CV_ONLY/REGRESSION')
+        
+        if(cv_reg_xt == "mat") {
+            proc_data <- reg_inputDatProcess(
+                c(
+                    "y",
+                    "d",
+                    "c",
+                    "a",
+                    "s",
+                    matfile,
+                    matfilenoext,
+                    annotfile,
+                    samplesvar,
+                    groupvar,
+                    outdir
+                )
+            )
+        } else if (cv_reg_xt == "csv") {
+            proc_data <- reg_input_dat_process_2D(
+                c(
+                    "y",
+                    "d",
+                    "c",
+                    "a",
+                    "s",
+                    matfile,
+                    matfilenoext,
+                    samplesvar,
+                    groupvar,
+                    outdir
+                )
+            )
+        }
+        
+        
+        
+        raw_sample_dfm$raw_sample_dfm <- proc_data[1]
+        raw_sample_dfm$raw_sample_dfm_wo_uni <- proc_data[2]
+        removeModal()
+        
+        
+        # insertUI(
+        #     selector = "#reg_configfilebutton",
+        #     where = "afterEnd",
+        #     ui = fileInput(
+        #         inputId = "reg_up_configs",
+        #         label = "Upload Config File",
+        #         multiple = FALSE
+        #     )
+        # )
+        enable("cv_reg_inputdata_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_reg_inputdata_check",
+                             value = TRUE)
+    })
+    
+    
+    cv_normdata <- reactiveValues()
+    
+    # Univariate button
+    observeEvent(input$cv_reg_univariate, {
+        if(cv_reg_xt == "mat"){
+            req(input$cv_reg_file_data, input$cv_reg_file_annotations, input$cv_reg_file_node)
+        } else if (reg_xt == "csv"){
+            print("UNIVARIATE  csv 2D")
+            req(input$cv_reg_file_data)
+        }
+        
+        
+        # unlink(file.path(tempdir(), 'OUTPUT'), recursive = TRUE, force = TRUE)
+        
+        # do.call(file.remove, list(list.files(
+        #     file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE'),
+        #     full.names = TRUE, recursive = TRUE
+        # )))
+        
+        matfilenoext <-
+            tools::file_path_sans_ext(input$cv_reg_file_data$name)
+        dat_file <-
+            paste0(tempdir(), "/OUTPUT/CV_ONLY/REGRESSION/", matfilenoext, "_2D.csv")
+        
+        nodefile <- input$cv_reg_file_node$datapath
+        dir.create(file.path(tempdir(), 'OUTPUT'), showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION'), showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'UNIVARIATE'),
+                   showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'UNIVARIATE', 'PNGFILES'),
+                   showWarnings = FALSE)
+        outdir <-
+            normalizePath(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'UNIVARIATE'))
+        node_id_var <- input$cv_reg_chosen_node
+        region_name_var <- input$cv_reg_chosen_region
+        
+        # getting values from input fields into an args[] fromat
+        inputArgs <- reg_univariateConfigs(reg_inputConfigs())
+        inputArgs[6] <- dat_file
+        inputArgs[7] <- matfilenoext
+        inputArgs[8] <- outdir
+        
+        
+        if(cv_reg_xt == "mat"){
+            inputArgs[32] <- nodefile
+            inputArgs[33] <- node_id_var
+            inputArgs[34] <- region_name_var
+        }
+        
+        show_modal_spinner(text = "Processing...")
+        withConsoleRedirect("cv_reg_console", {
+            if(cv_reg_xt == "mat"){
+                out <- reg_univariate(inputArgs)
+            } else if (reg_xt == "csv"){
+                reg_univariate_2D(inputArgs)
+            }
+        })
+        remove_modal_spinner()
+        
+        # print(out)
+        # setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+        # normdata$n <- data
+        #
+        # output$reg_plot <- renderPlotly({
+        #     normdata <- out[[1]]
+        #     fit_dfm <- out[[2]]
+        
+        #     dfm <- data.frame(normdata$genes, normdata$E)
+        #     pcutoff <- input$reg_uni_alpha
+        #     pb_name <- fit_dfm[fit_dfm$P.Value < pcutoff, 'ProbeName']
+        #     dfm <- dfm[dfm[, 'ProbeName'] %in% pb_name, ]
+        #     ogNcol <- dim(normdata$E)[2]
+        #     annoNcol <- dim(dfm)[2]
+        #     s <- (annoNcol - ogNcol + 1):annoNcol
+        #     mtx <- as.matrix(dfm[, s])
+        
+        #     heatmaply(mtx)
+        # })
+        
+        enable("cv_reg_univariate_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_reg_univariate_check",
+                             value = TRUE)
+        
+        # converting PDF results to PNGs to display in renderImage()
+        if (file.exists(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'UNIVARIATE', 'Rplots.pdf'))){
+            print("Rplots.pdf exists!, deleting now")
+        } else {
+            print("Rplots.pdf does not exist!")
+        }
+        pdf.list <-
+            list.files(path = file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'UNIVARIATE'),
+                       pattern = ".pdf$")
+        lapply(
+            pdf.list,
+            FUN = function(files) {
+                pdf_convert(
+                    files,
+                    format = "png",
+                    filenames = paste0(
+                        sep = "",
+                        tools::file_path_sans_ext(files),
+                        ".png"
+                    )
+                )
+            }
+        )
+        #updating the Select Input with the png filenames
+        filenames <-
+            list.files(
+                path = normalizePath(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'UNIVARIATE')),
+                pattern = ".png$",
+                full.names = FALSE
+            )
+        updateSelectInput(session = session,
+                          inputId = "cv_reg_select_uni_plot",
+                          choices = filenames)
+        
+    })
+    
+    # svm button
+    observeEvent(input$cv_reg_svm, {
+        if (cv_reg_xt == "mat"){
+            req(input$cv_reg_file_data, input$cv_reg_file_annotations, input$cv_reg_file_node)
+        } else if (cv_reg_xt == "csv"){
+            req(input$cv_reg_file_data)
+        }
+        
+        
+        matfilenoext <-
+            tools::file_path_sans_ext(input$cv_reg_file_data$name)
+        
+        dat_file <- switch(
+            input$cv_reg_modeltype,
+            cv_reg_noneset = paste0(tempdir(), "/OUTPUT/CV_ONLY/REGRESSION/", matfilenoext, "_2D.csv"),
+            cv_reg_kset = paste0(tempdir(), "/OUTPUT/CV_ONLY/REGRESSION/UNIVARIATE/", matfilenoext, "_ml.csv"),
+            cv_reg_uset = paste0(tempdir(), "/OUTPUT/CV_ONLY/REGRESSION/", matfilenoext, "_2D.csv")
+        )
+        
+        # cvuni <- FALSE
+        cvuni <- switch(
+            input$cv_reg_modeltype,
+            cv_reg_noneset = FALSE,
+            cv_reg_kset = FALSE,
+            cv_reg_uset = TRUE
+        )
+        print(cvuni)
+        
+        do.call(file.remove, list(list.files(
+            file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'ML_SVM'),
+            full.names = TRUE, recursive = TRUE
+        )))
+        
+        dir.create(file.path(tempdir(), 'OUTPUT'), showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION'),
+                   showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'ML_SVM'),
+                   showWarnings = FALSE)
+        dir.create(file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'ML_SVM', 'PNGFILES'),
+                   showWarnings = FALSE)
+        outdir <-
+            file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'ML_SVM')
+        
+        nodefile <- input$cv_reg_file_node$datapath
+        # configs <- uploaded_configs()[2][[1]]
+        # contrast <- reg_contrast$groups[1]
+        
+        if (isTruthy(input$reg_cores)){
+            paste0("parallel computing", input$reg_cores)
+            psetting <- TRUE
+            cores <- input$reg_cores
+        } else {
+            print("no parallel computing")
+        }
+        
+        # getting values from input fields into an args[] format
+        inputArgs <- reg_ml_svmConfigs(reg_inputConfigs())
+        inputArgs[6] <- dat_file
+        inputArgs[7] <- matfilenoext
+        inputArgs[8] <- outdir
+        inputArgs[9] <- psetting
+        inputArgs[10] <- cores
+        inputArgs[56] <- cvuni
+        
+        # if(reg_xt == "mat"){
+        #     inputArgs[64] <- contrast
+        # }
+        
+        
+        show_modal_spinner(text = "Running classifier...")
+        # withConsoleRedirect("reg_console", {
+        # invalidateLater(100)
+        reg_ml_svm(inputArgs)
+        
+        # })
+        remove_modal_spinner()
+        
+        # converting PDF results to PNGs to display in renderImage()
+        pdf.list <-
+            list.files(path = file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'ML_SVM'),
+                       pattern = ".pdf$")
+        # 
+        pdf_convert(pdf.list[1], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[1]), ".png"))
+        pdf_convert(pdf.list[2], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[2]), ".png"))
+        # pdf_convert(pdf.list[3], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[3]), ".png"))
+        pdf_convert(pdf.list[4], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[4]), ".png"))
+        pdf_convert(pdf.list[5], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[5]), ".png"))
+        pdf_convert(pdf.list[6], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[6]), ".png"))
+        pdf_convert(pdf.list[7], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[7]), ".png"))
+        pdf_convert(pdf.list[8], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[8]), ".png"))
+        pdf_convert(pdf.list[9], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[9]), ".png"))
+        pdf_convert(pdf.list[10], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[10]), ".png"))
+        pdf_convert(pdf.list[11], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[11]), ".png"))
+        pdf_convert(pdf.list[12], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[12]), ".png"))
+        pdf_convert(pdf.list[13], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[13]), ".png"))
+        # pdf_convert(pdf.list[14], format="png", filenames=paste0(tools::file_path_sans_ext(pdf.list[14]), ".png"))
+        # lapply(
+        #     pdf.list,
+        #     FUN = function(files) {
+        #         pdf_convert(
+        #             files,
+        #             format = "png",
+        #             filenames = paste0(
+        #                 sep = "",
+        #                 "PNGFILES/" ,
+        #                 tools::file_path_sans_ext(files),
+        #                 ".png"
+        #             )
+        #         )
+        #     }
+        # )
+        
+        #updating the Select Input with the png filenames
+        filenames <-
+            list.files(
+                path = file.path(tempdir(), 'OUTPUT', 'CV_ONLY', 'REGRESSION', 'ML_SVM'),
+                pattern = ".png$",
+                full.names = FALSE
+            )
+        updateSelectInput(session = session,
+                          inputId = "cv_reg_select_svm_plot",
+                          choices = filenames)
+        
+        enable("cv_reg_svm_check")
+        updatePrettyCheckbox(session = session,
+                             inputId = "cv_reg_svm_check",
+                             value = TRUE)
+        closeAllConnections()
+        
+    })
+    
+    # viewing plots
+    output$cv_reg_uni_plots <- renderImage({
+        req(input$cv_reg_univariate)
+        list(
+            src = file.path(
+                tempdir(),
+                'OUTPUT',
+                'CV_ONLY',
+                'REGRESSION',
+                'UNIVARIATE',
+                input$cv_reg_select_uni_plot
+            ),
+            alt = "Univariate plots",
+            width = 400,
+            height = 400
+        )
+        
+    }, deleteFile = FALSE)
+    
+    output$cv_reg_svm_plots <- renderImage({
+        req(input$cv_reg_svm)
+        list(
+            src = file.path(
+                tempdir(),
+                'OUTPUT',
+                'CV_ONLY',
+                'REGRESSION',
+                'ML_SVM',
+                input$cv_reg_select_svm_plot
+            ),
+            alt = "SVM plots",
+            width = 400,
+            height = 400
+        )
+        
+    }, deleteFile = FALSE)
+    
+    output$cv_reg_report <- downloadHandler(
+        
+        filename = function() {
+            paste("regression_report-", Sys.Date(), ".pdf", sep="")
+        },
+        content = function(file) {
+            setwd('/srv/shiny-server/')
+            tempReport <- file.path(tempdir(), 'reg_results.Rmd')
+            file.copy(file.path('srv', 'shiny-server', 'reg_results.Rmd'), tempReport, overwrite = TRUE)
+            # print("YOOOSSS")
+            # params <- list(n = 100)
+            rmarkdown::render(input = 'reg_results.Rmd')
+            file.copy(file.path('reg_results.pdf'), file)
+        }
+        
+    )
+    
+    output$cv_reg_allfiles <- downloadHandler(
+        
+        filename = function() {
+            paste("allfiles-", Sys.Date(), ".zip", sep="")
+        },
+        content = function(file) {
+            tempzip <- file.path(tempdir(), "results.zip")
+            zipr(tempzip, file.path(tempdir(), 'OUTPUT'))
+            file.copy(tempzip, file)
+        }
+    )
 }
 
 # Run the application
 shinyApp(ui = ui, server = server)
-
-# library(threeBrain)
-# library(shiny)
-# library(shinydashboard)
-# 
-# ui <-dashboardPage(dashboardHeader(),
-#                    dashboardSidebar(
-#                        sidebarMenu(
-#                            menuItem("Brain", tabName = 'brainout'),
-#                            menuItem("Plot", tabName = 'plotout')
-#                        )
-#                        
-#                        
-#                    ),
-#                    dashboardBody(tabItems(tabItem(
-#                        tabName = "brainout",
-#                        box(
-#                            status = "primary",
-#                            solidHeader = TRUE,
-#                            collapsible = TRUE,
-#                            title = "BrainViewer",
-#                            width = 12,
-#                            threejsBrainOutput(outputId = 'brain', height = '100vh')
-#                        )
-#                    ),
-#                    tabItem(
-#                        tabName = "plotout",
-#                        box(
-#                            status = "primary",
-#                            title = "Test",
-#                            solidHeader = TRUE,
-#                            collapsible = TRUE,
-#                            width = 12,
-#                            plotOutput("plot1", click = "plot_click"),
-#                        )
-#                    ))))
-# 
-# 
-# server <- function(input, output, session) {
-# 
-#     output$plot1 <- renderPlot({
-#         plot(mtcars$wt, mtcars$mpg)
-#     })
-# 
-#     output$brain <- renderBrain({
-#         brain = threeBrain::freesurfer_brain(
-#             fs_subject_folder = '~/rave_data/others/three_brain/N27/', subject_name = 'N27',
-#             additional_surfaces = c('white', 'smoothwm')
-#         )
-#         plot( brain )
-#     })
-# }
-# 
-# shinyApp(ui, server, options = list(launch.browser = TRUE))

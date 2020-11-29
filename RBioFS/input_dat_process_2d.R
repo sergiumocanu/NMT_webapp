@@ -9,8 +9,8 @@
 
 inputDatProcess2d <- function(args) {
 ###### load libraries --------
-require(foreach)
-require(R.matlab) # to read .mat files
+library(foreach)
+library(R.matlab) # to read .mat files
 
 ###### sys variables --------
 # --- file name variables ---

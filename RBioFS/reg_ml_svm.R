@@ -511,5 +511,5 @@ reg_ml_svm <- function(args) {
   cat("\t\t",
       paste0(MAT_FILE_NO_EXT, "_hclust_nestedcv_training_heatmap.pdf"),
       "\n")
-  
+  # close(MAT_FILE_NO_EXT, "_svm_results.txt")
 }

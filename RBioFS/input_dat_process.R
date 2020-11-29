@@ -12,8 +12,8 @@ inputDatProcess <- function(args){
 
 
 ###### load libraries --------
-require(foreach)
-require(R.matlab) # to read .mat files
+library(foreach)
+library(R.matlab) # to read .mat files
 
 ###### sys variables --------
 # --- file name variables ---
@@ -36,7 +36,7 @@ raw <- raw[[1]]
 raw_dim <- dim(raw)
 
 # ------ load annotation file (meta data) ------
-annot <- read.csv(file = ANNOT_FILE, stringsAsFactors = FALSE, check.names = FALSE)
+annot <- read.csv(file = ANNOT_FILE, stringsAsFactors = FALSE, check.names = FALSE, fileEncoding = "UTF-8-BOM")
 if (!all(c(SAMPLEID_VAR, GROUP_VAR) %in% names(annot))) {
   cat("none_existent")
   quit()

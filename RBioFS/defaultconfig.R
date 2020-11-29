@@ -1,6 +1,6 @@
-require(readr)
-require(stringr)
-require(shiny)
+library(readr)
+library(stringr)
+library(shiny)
 
 # list of all variable names
 varNames <- function(){
@@ -459,6 +459,75 @@ ml_svmConfigs <- function(configs){
   args[76] <- configs$rffs_htmap_width
   
   args[77] <- configs$random_state
+  
+  return(args)
+}
+
+# plsda arguments from inputs
+plsdaConfigs <- function(configs){
+  # remoing all the \ and " characters from inputs
+  configs <- lapply(configs, function(x) str_remove_all(x, '\"'))
+  
+  # setting an empty vector as the arguments
+  args <- vector()
+  args[11] = configs$cpu_cluster
+  
+  args[12] = configs$plsda_validation
+  args[13] = configs$plsda_validation_segment
+  args[14] = configs$plsda_init_ncomp
+  args[15] = configs$plsda_ncomp_select_method
+  args[16] = configs$plsda_ncomp_select_plot_symbol_size
+  args[17] = configs$plsda_ncomp_select_plot_legend_size
+  args[18] = configs$plsda_ncomp_select_plot_x_label_size
+  args[19] = configs$plsda_ncomp_select_plot_x_tick_label_size
+  args[20] = configs$plsda_ncomp_select_plot_y_label_size
+  args[21] = configs$plsda_ncomp_select_plot_y_tick_label_size
+  
+  args[22] = configs$plsda_perm_method
+  args[23] = configs$plsda_perm_n
+  args[24] = configs$plsda_perm_plot_symbol_size
+  args[25] = configs$plsda_perm_plot_legend_size
+  args[26] = configs$plsda_perm_plot_x_label_size
+  args[27] = configs$plsda_perm_plot_x_tick_label_size
+  args[28] = configs$plsda_perm_plot_y_label_size
+  args[29] = configs$plsda_perm_plot_y_tick_label_size
+  args[30] = configs$plsda_perm_plot_width
+  args[31] = configs$plsda_perm_plot_height
+  
+  args[32] = configs$plsda_scoreplot_ellipse_conf
+  args[33] = configs$pca_biplot_symbol_size
+  args[34] = configs$pca_biplot_ellipse
+  args[35] = configs$pca_biplot_multi_density
+  args[36] = configs$pca_biplot_multi_striplabel_size
+  args[37] = configs$pca_rightside_y
+  args[38] = configs$pca_x_tick_label_size
+  args[39] = configs$pca_y_tick_label_size
+  args[40] = configs$pca_width
+  args[41] = configs$pca_height
+  
+  args[42] = configs$plsda_roc_smooth
+  args[43] = configs$svm_roc_symbol_size
+  args[44] = configs$svm_roc_legend_size
+  args[45] = configs$svm_roc_x_label_size
+  args[46] = configs$svm_roc_x_tick_label_size
+  args[47] = configs$svm_roc_y_label_size
+  args[48] = configs$svm_roc_y_tick_label_size
+  
+  args[49] = configs$plsda_vip_alpha
+  args[50] = configs$plsda_vip_boot
+  args[51] = configs$plsda_vip_boot_n
+  args[52] = configs$plsda_vip_plot_errorbar
+  args[53] = configs$plsda_vip_plot_errorbar_width
+  args[54] = configs$plsda_vip_plot_errorbar_label_size
+  args[55] = configs$plsda_vip_plot_x_textangle
+  args[56] = configs$plsda_vip_plot_x_label_size
+  args[57] = configs$plsda_vip_plot_x_tick_label_size
+  args[58] = configs$plsda_vip_plot_y_label_size
+  args[59] = configs$plsda_vip_plot_y_tick_label_size
+  args[60] = configs$plsda_vip_plot_width
+  args[61] = configs$plsda_vip_plot_height
+  
+  args[62] = configs$random_state
   
   return(args)
 }

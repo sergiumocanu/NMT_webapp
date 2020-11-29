@@ -10,6 +10,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(fig.path=file.path(tempdir(), 'OUTPUT/REGRESSION/UNIVARIATE/'), echo = FALSE)
+knitr::opts_chunk$set(fig.path=file.path(tempdir(), 'OUTPUT/REGRESSION/ML_SVM/'), echo = FALSE)
 ```
 
 
@@ -26,6 +27,7 @@ The SVM plots follow.
 
 ```{r, echo=FALSE}
 myimages<-normalizePath(list.files(file.path(tempdir(), 'OUTPUT/REGRESSION/ML_SVM/'), pattern = ".pdf", full.names = TRUE))
+myimages<- myimages[c(1:2,4:14)]
 myimages <- gsub("\\\\", "/", myimages)
 knitr::include_graphics(myimages)
 ```

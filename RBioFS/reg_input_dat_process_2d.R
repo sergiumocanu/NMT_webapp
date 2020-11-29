@@ -4,7 +4,8 @@
 ## version: 0.2.0
 
 ## flags from Rscript
-args <- commandArgs()
+reg_input_dat_process_2D <- function(args) {
+# args <- commandArgs()
 # print(args)
 
 ###### load libraries --------
@@ -34,6 +35,7 @@ if (!all(c(SAMPLEID_VAR, Y_VAR) %in% names(raw_csv))) {
 }
 y <- raw_csv[, Y_VAR]
 sampleid <- raw_csv[, SAMPLEID_VAR]
+raw_dim <- dim(raw_csv)
 
 # ------ process the mat file with the mata data ------
 raw_sample_dfm <- data.frame(sampleid = sampleid, y = y, raw_csv[, !names(raw_csv) %in% c(SAMPLEID_VAR, Y_VAR)], row.names = NULL)
@@ -49,3 +51,4 @@ write.csv(file = paste0(RES_OUT_DIR, "/", CSV_2D_FILE_NO_EXT, "_2D.csv"), raw_sa
 
 ## cat the vairables to export to shell scipt
 cat("\tMat file dimensions: ", raw_dim, "\n") # line 2: input mat file dimension
+}

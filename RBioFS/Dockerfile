@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     poppler-utils \
     libpoppler-cpp-dev \
+    texlive-full \
     texlive-latex-recommended \
     texlive-fonts-recommended
     
@@ -30,7 +31,6 @@ RUN R -e "install.packages('foreach', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('doParallel', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('parallel', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('splines', repos='http://cran.rstudio.com/')"
-
 RUN R -e "install.packages('shiny', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('shinydashboard', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('shinyjs', repos='http://cran.rstudio.com/')"
@@ -48,17 +48,17 @@ RUN R -e "install.packages('data.table', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('rmarkdown', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('zip', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('d3heatmap', repos='http://cran.rstudio.com/')"
-RUN R -e "install.packages('splines', repos='http://cran.rstudio.com/')"
-RUN R -e "install.packages('splines', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('pdftools', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('tinytex', repos='http://cran.rstudio.com/')"
 RUN R -e "tinytex::install_tinytex()"
 RUN R -e "install.packages('pdftools', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('plotly', repos='http://cran.rstudio.com/')"
+RUN R -e "install.packages('shinybusy', repos='http://cran.rstudio.com/')"
+RUN R -e "install.packages('GGally', repos='http://cran.rstudio.com/')"
 
 # installing github packages
 RUN R -e "devtools::install_github('jzhangc/git_R_STATS_KBS/package/rbioplot')"
-RUN R -e "devtools::install_github('jzhangc/git_RBioArray/RBioArray', repos = BiocManager::repositories(), ref = 'beta', auth_token = '3e75fdcb6a992366ff2b26839441e21318c19985')"
+RUN R -e "devtools::install_github('jzhangc/git_RBioArray/RBioArray', repos = BiocManager::repositories(), ref = 'beta')"
 RUN R -e "devtools::install_github('jzhangc/git_RBioFS/RBioFS', repos = BiocManager::repositories(), ref = 'beta')"
 
 # copy the app to the image
@@ -75,7 +75,18 @@ COPY reg_input_dat_process.R /srv/shiny-server/
 COPY reg_univariate.R /srv/shiny-server/
 COPY reg_ml_svm.R /srv/shiny-server/
 COPY results.Rmd /srv/shiny-server/
-
+COPY reg_results.Rmd /srv/shiny-server/
+COPY reg_input_dat_process_2d.R /srv/shiny-server/
+COPY reg_univariate_2D.R /srv/shiny-server/
+COPY R/serverElements.R /srv/shiny-server/R/
+COPY cv_ml_svm.R /srv/shiny-server/
+COPY cv_plsda_val_svm.R /srv/shiny-server/
+COPY cv_reg_ml_svm.R /srv/shiny-server/
+COPY cv_reg_plsr_val_svm.R /srv/shiny-server/
+COPY plsda_val_svm.R /srv/shiny-server/
+COPY reg_plsr_val_svm.R /srv/shiny-server/
+COPY pred_classif.R /srv/shiny-server/
+COPY pred_dat_process.R /srv/shiny-server/
 
 # select port
 EXPOSE 3838

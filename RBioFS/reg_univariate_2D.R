@@ -4,8 +4,10 @@
 ## version: 0.2.0
 
 ## test from Rscript
-args <- commandArgs()
+# args <- commandArgs()
 # print(args)
+
+reg_univariate_2D <- function(args){
 
 ### load libraries --------
 require(foreach)
@@ -234,4 +236,5 @@ if (NO_SIG_WARNING) {
   cat("Check output folder for the results. \n")
 } else {
   cat(paste0("\t", MAT_FILE_NO_EXT, "_fit_hclust_sig.pdf\n"))
+}
 }

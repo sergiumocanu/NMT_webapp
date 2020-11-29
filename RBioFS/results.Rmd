@@ -11,6 +11,7 @@ output:
 options(tinytex.verbose = TRUE)
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(fig.path=file.path(tempdir(), 'OUTPUT/UNIVARIATE/'), echo = FALSE)
+knitr::opts_chunk$set(fig.path=file.path(tempdir(), 'OUTPUT/ML_SVM/'), echo = FALSE)
 ```
 
 
@@ -18,6 +19,7 @@ This is a report of all the images generated via the Univariate analysis. We can
 
 ```{r, echo=FALSE}
 myimages<-normalizePath(list.files(file.path(tempdir(), 'OUTPUT/UNIVARIATE/'), pattern = ".pdf", full.names = TRUE))
+myimages<-myimages[1:7]
 myimages <- gsub("\\\\", "/", myimages)
 knitr::include_graphics(myimages)
 ```

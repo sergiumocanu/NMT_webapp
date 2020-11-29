@@ -108,7 +108,8 @@ univariate <- function(args) {
   node <-
     read.csv(file = NODE_FILE,
              stringsAsFactors = FALSE,
-             check.names = FALSE)
+             check.names = FALSE,
+             fileEncoding = "UTF-8-BOM")
   if (!all(c(NODE_ID_VAR, REGION_NAME_VAR) %in% names(node))) {
     cat("none_existent")
     quit()
