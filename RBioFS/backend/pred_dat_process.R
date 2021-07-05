@@ -65,7 +65,7 @@ if (is.null(nrow(raw_sample))){  # one entry only
   raw_sample_dfm <- data.frame(as.list(raw_sample))
   names(raw_sample_dfm) <- names(raw_sample)  
 }
-raw_sample_dfm <- data.frame(sampleid = sampleid, t(raw_sample), row.names = NULL, check.names = FALSE)
+raw_sample_dfm <- data.frame(sampleid = sampleid, raw_sample_dfm, row.names = NULL, check.names = FALSE)
 
 # ------ export and clean up the mess --------
 ## export to results files if needed
