@@ -1,7 +1,7 @@
 ###### general info --------
 ## name: pred_classif.R
 ## purpose: load and process mat file for prediction
-## version: 0.3.0
+## version: 0.3.2
 ## Make sure to have 3 dimensions for the mat data, even when there is only one matrix, e.g. 90x90x1
 
 ## flags from Rscript
@@ -9,6 +9,7 @@
 # print(args)
 
 pred_classif <- function(args){
+
 ###### load libraries --------
 library(foreach)
 library(RBioFS)
@@ -55,11 +56,11 @@ load(MODEL_FILE)
 raw_sample_dfm <- read.csv(file = DAT_FILE, stringsAsFactors = FALSE, check.names = FALSE)
 
 # ------ subset features according to model ----
-if (!all(svm_rf_selected_pairs %in% names(raw_sample_dfm)[-1])){
+if (!all(svm_rf_selected_features %in% names(raw_sample_dfm)[-1])){
   cat("feature_error")
   quit()
 } else {
-  x <- raw_sample_dfm[, names(raw_sample_dfm) %in% svm_rf_selected_pairs]
+  x <- raw_sample_dfm[, names(raw_sample_dfm) %in% svm_rf_selected_features]
   rownames(x) <- raw_sample_dfm$sampleid
   dat_subset <- data.frame(sampleid = rownames(x), x, check.names = FALSE)
   sampleid_pred <- rownames(x)
@@ -71,7 +72,7 @@ write.csv(file = paste0(RES_OUT_DIR, "/", "data_subset.csv"), dat_subset, row.na
 
 # ------ predict ------
 if (PSETTING) {
-  cl <- makeCluster(CORES, type = CPU_CLUSTER)
+  cl <- parallel::makeCluster(CORES, type = CPU_CLUSTER)
   registerDoParallel(cl)
   dummy <- foreach(i = 1:nrow(x), .packages = "RBioFS") %dopar% {
     rbioClass_svm_predcit(object = svm_m,
@@ -82,7 +83,7 @@ if (PSETTING) {
                        export.name = rownames(x[i, ]),
                        plot.Width = PIE_WIDTH, plot.Height = PIE_HEIGHT,
                        verbose = FALSE)
-    # stopCluster(cl)
+    parallel::stopCluster(cl)
   }
 } else {
   dummy <- foreach(i = 1:nrow(x), .packages = "RBioFS") %do% {

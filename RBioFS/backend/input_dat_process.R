@@ -1,19 +1,17 @@
 ###### general info --------
 ## name: mat_process.R
 ## purpose: load and process mat files
-## version: 0.2.0
+## version: 0.3.2
 
 ## flags from Rscript
 # args <- commandArgs()
 # print(args)
 
 inputDatProcess <- function(args){
-  
-
 
 ###### load libraries --------
-library(foreach)
-library(R.matlab) # to read .mat files
+require(foreach)
+require(R.matlab) # to read .mat files
 
 ###### sys variables --------
 # --- file name variables ---
@@ -36,7 +34,7 @@ raw <- raw[[1]]
 raw_dim <- dim(raw)
 
 # ------ load annotation file (meta data) ------
-annot <- read.csv(file = ANNOT_FILE, stringsAsFactors = FALSE, check.names = FALSE, fileEncoding = "UTF-8-BOM")
+annot <- read.csv(file = ANNOT_FILE, stringsAsFactors = FALSE, check.names = FALSE)
 if (!all(c(SAMPLEID_VAR, GROUP_VAR) %in% names(annot))) {
   cat("none_existent")
   quit()

@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y \
 # install R packages required 
 # (change it dependeing on the packages you need)
 RUN R -e "install.packages('devtools', dependencies=TRUE)"
+RUN R -e "install.packages('remotes')"
 RUN R -e "install.packages('BiocManager', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('R.matlab', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('ggrepel', repos='http://cran.rstudio.com/')"
@@ -31,6 +32,7 @@ RUN R -e "install.packages('foreach', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('doParallel', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('parallel', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('splines', repos='http://cran.rstudio.com/')"
+RUN R -e "remotes::install_github(\"r-lib/later\")"
 RUN R -e "install.packages('shiny', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('shinydashboard', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('shinyjs', repos='http://cran.rstudio.com/')"
@@ -55,38 +57,28 @@ RUN R -e "install.packages('pdftools', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('plotly', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('shinybusy', repos='http://cran.rstudio.com/')"
 RUN R -e "install.packages('GGally', repos='http://cran.rstudio.com/')"
+RUN R -e "remotes::install_github(\"sidchop/brainconn\")"
+RUN R -e "install.packages('igraph', repos='http://cran.rstudio.com/')"
+RUN R -e "install.packages('WGCNA', repos='http://cran.rstudio.com/')"
+RUN R -e "install.packages('dendextend', repos='http://cran.rstudio.com/')"
+RUN R -e "install.packages('gtools', repos='http://cran.rstudio.com/')"
 
 # installing github packages
 RUN R -e "devtools::install_github('jzhangc/git_R_STATS_KBS/package/rbioplot')"
-RUN R -e "devtools::install_github('jzhangc/git_RBioArray/RBioArray', repos = BiocManager::repositories(), ref = 'beta')"
+RUN R -e "BiocManager::install(c('limma','edgeR'))"
+RUN touch /home/.Renviron
+RUN echo GITHUB_PAT='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' > /home/.Renviron
+RUN R -e "devtools::install_github('jzhangc/git_RBioArray/RBioArray', repos = BiocManager::repositories(), ref = 'beta', auth_token = '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')"
 RUN R -e "devtools::install_github('jzhangc/git_RBioFS/RBioFS', repos = BiocManager::repositories(), ref = 'beta')"
+RUN R -e "install.packages('kableExtra', repos='http://cran.rstudio.com/')"
 
 # copy the app to the image
 COPY app.R /srv/shiny-server/
-COPY configs_format.R /srv/shiny-server/
-COPY defaultconfig.R /srv/shiny-server/
-COPY input_dat_process.R /srv/shiny-server/
-COPY input_dat_process_2d.R /srv/shiny-server/
-COPY univariate.R /srv/shiny-server/
-COPY univariate_2D.R /srv/shiny-server/
-COPY ml_svm.R /srv/shiny-server/
-COPY R/uiElements.R /srv/shiny-server/R/
-COPY reg_input_dat_process.R /srv/shiny-server/
-COPY reg_univariate.R /srv/shiny-server/
-COPY reg_ml_svm.R /srv/shiny-server/
+COPY ./utils /srv/shiny-server/utils
+COPY ./backend /srv/shiny-server/backend
 COPY results.Rmd /srv/shiny-server/
 COPY reg_results.Rmd /srv/shiny-server/
-COPY reg_input_dat_process_2d.R /srv/shiny-server/
-COPY reg_univariate_2D.R /srv/shiny-server/
-COPY R/serverElements.R /srv/shiny-server/R/
-COPY cv_ml_svm.R /srv/shiny-server/
-COPY cv_plsda_val_svm.R /srv/shiny-server/
-COPY cv_reg_ml_svm.R /srv/shiny-server/
-COPY cv_reg_plsr_val_svm.R /srv/shiny-server/
-COPY plsda_val_svm.R /srv/shiny-server/
-COPY reg_plsr_val_svm.R /srv/shiny-server/
-COPY pred_classif.R /srv/shiny-server/
-COPY pred_dat_process.R /srv/shiny-server/
+COPY predResults.Rmd /srv/shiny-server/
 
 # select port
 EXPOSE 3838

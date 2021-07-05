@@ -1,0 +1,85 @@
+---
+title: "Machine Learning Analysis Results"
+author: "Dunkley Lab"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+header-includes:
+  - \usepackage{float}
+  - \usepackage{booktabs}
+output: 
+  pdf_document:
+    fig_caption: true
+---
+
+```{r setup, include=FALSE}
+options(tinytex.verbose = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.path=file.path(tempdir(), 'OUTPUT', 'PREDICTION'), echo = FALSE)
+# knitr::opts_chunk$set(fig.path=file.path(tempdir(), 'OUTPUT/ML_SVM/'), echo = FALSE)
+```
+
+
+This is a report of all the classifier predictions and brain connectivity diagrams
+
+```{r, echo=FALSE}
+library(brainconn)
+
+x <- read.csv(normalizePath(file.path(tempdir(),'OUTPUT','PREDICTION','data_subset.csv')), check.names = FALSE)
+mtx <- matrix(0, nrow = 90, ncol = 90)
+row_idx <- as.numeric(sub("\\_.*", "", colnames(x)[2:length(colnames(x))]))
+col_idx <- as.numeric(sub("^[^_]*_", "", colnames(x)[2:length(colnames(x))]))
+
+for (i in seq_len(dim(x)[1])){                   #dim(x)[2]
+  d <- unlist(unname(x[i, 2:length(colnames(x))]))
+  mtx[cbind(row_idx, col_idx)] <- d
+  mtx[cbind(col_idx, row_idx)] <- d
+  p <- suppressMessages(brainconn(atlas ="aal90", conmat=mtx, view = "ortho", edge.color.weighted = T))
+  f <- paste0(tempdir(), '/OUTPUT/PREDICTION/PNGFILES/CONNECTIVITY/', i, '.brain.connectivity.png')
+  suppressMessages(ggsave(f, plot = p, device = "png"))
+}
+```
+
+```{r, figures-side, fig.show="hold", out.width="50%", results="asis"}
+library(kableExtra)
+images <- gtools::mixedsort(list.files(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'PNGFILES', 'CONNECTIVITY'), pattern = ".png", full.names = TRUE))
+connectivity_imgs <- gsub("\\\\", "/", images)
+images <- gtools::mixedsort(list.files(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'PNGFILES'), pattern = ".png", full.names = TRUE))
+piechart_imgs <- gsub("\\\\", "/", images)
+load(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'model.Rdata'))
+
+kernels <- c("linear", "polynomial", "radial", "sigmoid")
+
+if(exists("svm_m_test_svm_roc_auc")){
+  auc <- svm_m_test_svm_roc_auc$svm.roc_object$control$auc[1]
+} else {
+  auc <- " "
+}
+
+model_data <- data.frame(property = c("SVM-Type:", "SVM-Kernel:", "Cost:", "Gamma:", "Number of Support Vectors:", "AUC:"), 
+                  value = c(svm_m$model.type, kernels[svm_m$kernel+1], svm_m$cost, svm_m$gamma, svm_m$tot.nSV, auc))
+
+annotations <- read.csv(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'annot.csv'), check.names = FALSE)
+
+for (i in seq_len(dim(x)[1])){     #seq_len(dim(x)[1])
+  subject <- sub("\\..*", "", basename(piechart_imgs[i]))
+  c <- as.numeric(subject)
+  cat("\n## Subject", subject, "\n")
+  cat(paste0("![](", connectivity_imgs[c],"){width=50%}"))
+  cat(paste0("![](", piechart_imgs[c],"){width=50%}"), "\n")
+  
+  ann <- unname(as.matrix(annotations))[c, ]
+  subject_data <- data.frame(cnames = colnames(annotations), 
+                           vals = unlist(ann, use.names = FALSE))
+  
+  t1 <- knitr::kable(model_data, format = "latex", col.names = NULL, booktabs = T, valign = 't')
+  t2 <- knitr::kable(subject_data, format = "latex", col.names = NULL, booktabs = T, valign = 't')
+  
+  cat(c("\\begin{table}[H] \\centering ",
+        "\\caption{Left: Model Information. Right: Subject Information}",
+        t1,
+        "\\hspace{1cm} \\centering ",
+        t2,
+        "\\end{table}"))
+  cat("\n\n\\pagebreak\n")
+}
+
+```

@@ -996,17 +996,17 @@ executeSVM <- function(univariate_bttnID, svm_bttnID, modeltypeID, noneID, ksetI
     status = "primary",
     width = 4,
     height = 400,
-
-    actionButton(
+    useShinyjs(),
+    disabled(actionButton(
       inputId = univariate_bttnID,
       label = "Run Univariate",
       width = 125
-    ),
-    actionButton(
+    )),
+    disabled(actionButton(
       inputId = svm_bttnID,
       label = "Run SVM model",
       width = 125
-    ),
+    )),
     radioButtons(
       inputId = modeltypeID,
       label = "Run SVM with or without prior knowledge: ",
@@ -3807,7 +3807,8 @@ predictUI <- function(id) {
     collapsible = TRUE,
     title = "Predict classification with trained model",
     width = 12,
-    
+    fluidRow(
+      useShinyjs(),
     column(width = 6,
       fileInput(
         inputId = ns("data"),
@@ -3830,7 +3831,19 @@ predictUI <- function(id) {
       h4("Select the sample variable"),
       dataTableOutput(ns("varnames")),
       h4(""),
-      actionButton(ns("predict"), "Predict")
+      disabled(actionButton(ns("predict"), "Predict")),
+      fluidRow(
+        column(
+          width = 6,
+          h4("Model Information"),
+          tableOutput(ns("model"))
+        ),
+        column(
+          width = 6,
+          h4("Subject Information"),
+          tableOutput(ns("subject"))
+        )
+      )
     ),
     
     column(
@@ -3841,8 +3854,28 @@ predictUI <- function(id) {
         choices = NULL,
         width = '100%'
       ),
-      imageOutput(ns("predictionplots")),
-      downloadButton(ns("downloadPredictions"), "Download Prediction Files")
+      imageOutput(ns("predictionplots"), height = "90%"),
+      
+      textOutput("blank text"),
+      plotOutput(ns("brainConnectivity_top")),
+      fluidRow(
+        column(
+          width = 12,
+          radioButtons(ns("connectivity_view"), "Select View:", c("top", "bottom", "left", "right", "front", "back"))
+        ),
+        column(
+          width = 6,
+          downloadButton(ns("downloadPredictions"), "Download Prediction Files"),
+          downloadButton(ns("downloadPredictionsReport"), "Generate Report")
+        )
+      )
+      
     )
+    )
+    # column(
+    #   width = 12,
+    #   plotOutput(ns("brainConnectivity"))
+    # )
+    
   )
 }

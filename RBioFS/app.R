@@ -5,7 +5,6 @@
 # Find out more about building applications with Shiny here:
 #
 #    http://shiny.rstudio.com/
-#
 
 library(shiny)
 library(shinydashboard)
@@ -23,24 +22,15 @@ library(data.table)
 library(pdftools)
 library(rmarkdown)
 library(zip)
+library(brainconn)
+library(plotly)
+library(parallel)
 
-source("input_dat_process.R")
-source("univariate.R")
-source("defaultconfig.R")
-source("ml_svm.R")
-source("configs_format.R")
-source("R/uiElements.R")
-source("R/serverElements.R")
-source("reg_input_dat_process.R")
-source("reg_univariate.R")
-source("reg_ml_svm.R")
-source("input_dat_process_2d.R")
-source("univariate_2D.R")
-source("reg_input_dat_process_2d.R")
-source("reg_univariate_2D.R")
-source("plsda_val_svm.R")
-source("cv_ml_svm.R")
-source("cv_plsda_val_svm.R")
+
+file.sources = list.files(c("./backend", "./utils"),
+                          pattern="*.R$", full.names=TRUE,
+                          ignore.case=TRUE)
+sapply(file.sources,source,.GlobalEnv)
 
 
 withConsoleRedirect <- function(containerId, expr) {
@@ -90,14 +80,15 @@ ui <- dashboardPage(
     
     
     # Header in top left of window
-    dashboardHeader(title = "Connectivity Classification"),
+    dashboardHeader(title = "Neuro-ML-Tools (NMT)"),
     
     # sidebar menu items
     dashboardSidebar(sidebarMenu(
         menuItem(text = "Classification Analysis", tabName = "svm"),
         menuItem(text = "Regression Analysis", tabName = "regression"),
         menuItem(text = "CV-Only Classification Analysis", tabName = "cv"),
-        menuItem(text = "CV-Only Regression Analysis", tabName = "cv_regression")
+        menuItem(text = "CV-Only Regression Analysis", tabName = "cv_regression"),
+        menuItem(text = "References", tabName = "references")
     )),
     
     
@@ -142,7 +133,8 @@ ui <- dashboardPage(
                     "allfiles"
                 )
             ),
-            fluidRow(predictUI("regular"))
+            fluidRow(predictUI("regular")),
+            plotlyOutput("brainConnectivity")
             
         ),
         tabItem(
@@ -308,6 +300,14 @@ ui <- dashboardPage(
             # )
 
 
+        ),
+        tabItem(
+            tabName = "references",
+            h1("If you use our application please cite the following papers: "),
+            h3("Version 0.1.2"),
+            p("Zhang J, Richardson DJ, Dunkley BT. 2020. Classifying post-traumatic stress disorder using the magnetoencephalographic connectome and machine learning. Scientific Reports. 10(1): 5937. doi: 10.1038/s41598-020-62713-5"),
+            p("Zhang J, Hadj-Moussa H, Storey KB. 2016. Current progress of high-throughput microRNA differential expression analysis and random forest gene selection for model and non-model systems: an R implementation. J Integr Bioinform. 13: 306. doi: 10.1515/jib-2016-306")
+            
         )
     ))
 )
@@ -1296,6 +1296,9 @@ server <- function(input, output, session) {
         updatePrettyCheckbox(session = session,
                              inputId = "inputdata_check",
                              value = TRUE)
+        
+        runjs('document.getElementById(\"univariate\").scrollIntoView(true)')
+        enable("univariate")
     })
 
     # upload configurations from file
@@ -1437,6 +1440,8 @@ server <- function(input, output, session) {
         updateSelectInput(session = session,
                           inputId = "select_uni_plot",
                           choices = filenames)
+        
+        enable("svm")
 
     })
 
@@ -2309,7 +2314,7 @@ server <- function(input, output, session) {
         #updating the Select Input with the png filenames
         filenames <-
             list.files(
-                path = normalizePath(file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE')),
+                path = normalizePath(file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'UNIVARIATE', 'PNGFILES')),
                 pattern = ".png$",
                 full.names = FALSE
             )
@@ -2423,7 +2428,7 @@ server <- function(input, output, session) {
         #updating the Select Input with the png filenames
         filenames <-
             list.files(
-                path = file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'ML_SVM'),
+                path = file.path(tempdir(), 'OUTPUT', 'REGRESSION', 'ML_SVM', 'PNGFILES'),
                 pattern = ".png$",
                 full.names = FALSE
             )
@@ -2448,6 +2453,7 @@ server <- function(input, output, session) {
                 'OUTPUT',
                 'REGRESSION',
                 'UNIVARIATE',
+                'PNGFILES',
                 input$reg_select_uni_plot
             ),
             alt = "Univariate plots",
@@ -2465,6 +2471,7 @@ server <- function(input, output, session) {
                 'OUTPUT',
                 'REGRESSION',
                 'ML_SVM',
+                'PNGFILES',
                 input$reg_select_svm_plot
             ),
             alt = "SVM plots",

@@ -8,7 +8,7 @@
 # args <- commandArgs()
 # print(args)
 
-cv_revg_ml_svm <- function(args){
+cv_reg_ml_svm <- function(args){
   
 ######  load libraries --------
 require(RBioFS)
