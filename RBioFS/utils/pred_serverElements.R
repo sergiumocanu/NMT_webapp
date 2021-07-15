@@ -48,7 +48,8 @@ uploadFilesServer <- function(id){
           #                ncol = 1)
           df <- read.csv(annotationsFile()$datapath,
                          header = TRUE,
-                         sep = ",")
+                         sep = ",",
+                         check.names = FALSE)
           # dater[[1, 1]] <- df
         } else if (xt == "csv") {
           dater <- data.frame(data()[2]) # will have to change this later!!!
@@ -119,7 +120,7 @@ predictServer <- function(id){
         input$annotations
       })
       annotations_data <- reactive({
-        read.csv(inputAnnotations()$datapath)
+        read.csv(inputAnnotations()$datapath, check.names = FALSE)
       })
       
       # getting the model
@@ -157,6 +158,7 @@ predictServer <- function(id){
         mat_file_no_ext <- tools::file_path_sans_ext(inputFile()$name)
         annot_file <- inputAnnotations()$datapath
         sampleid_var <- chosenSampleVar()
+        unlink(file.path(tempdir(), 'OUTPUT', 'PREDICTION'), recursive = TRUE)
         # do.call(file.remove, list(list.files(
         #   file.path(tempdir(), 'OUTPUT', 'PREDICTION'),
         #   full.names = TRUE, recursive = TRUE
@@ -177,8 +179,7 @@ predictServer <- function(id){
       })
 
       observeEvent(input$varnames_row_last_clicked, {
-        browser()
-        cat(" WE JUST SELECTED THE ROW")
+        # cat(" WE JUST SELECTED THE ROW")
         # file.copy("predResults.Rmd", file.path(tempdir(), 'OUTPUT','PREDICTION','predResults.Rmd'))
         pred_dat_process(inputArgs())
         enable("predict")
@@ -217,16 +218,21 @@ predictServer <- function(id){
       })
       
       observeEvent(input$predict, {
-        browser()
         show_modal_spinner(text = "Running classifier...")
+        
+        # unlink(file.path(tempdir(), 'OUTPUT', 'PREDICTION'), recursive = TRUE)
         
         file.copy(inputModel()$datapath, file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'model.Rdata'))
         file.copy(inputAnnotations()$datapath, file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'annot.csv'))
-        
+        file.copy("predResults.Rmd", file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'predResults.Rmd'))
         
         
         pred_classif(predInputArgs())
-        
+        # unlink(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'PNGFILES'))
+        # do.call(file.remove, list(list.files(
+        #     file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'PNGFILES'),
+        #     full.names = TRUE, recursive = TRUE
+        # )))
         dir.create(
           file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'PNGFILES', 'CONNECTIVITY'),
           showWarnings = FALSE,
@@ -267,9 +273,26 @@ predictServer <- function(id){
         updateSelectInput(session = session,
                           inputId = "plotname",
                           choices = files)
-        setwd("/srv/shiny-server")
+        # setwd("/srv/shiny-server")
+        
+        # render the connectivity png files
+        library(brainconn)
+        
+        x <- read.csv(normalizePath(file.path(tempdir(),'OUTPUT','PREDICTION','data_subset.csv')), check.names = FALSE)
+        mtx <- matrix(0, nrow = 90, ncol = 90)
+        row_idx <- as.numeric(sub("\\_.*", "", colnames(x)[2:length(colnames(x))]))
+        col_idx <- as.numeric(sub("^[^_]*_", "", colnames(x)[2:length(colnames(x))]))
+        
+        for (i in seq_len(dim(x)[1])){                   #dim(x)[2]
+          d <- unlist(unname(x[i, 2:length(colnames(x))]))
+          mtx[cbind(row_idx, col_idx)] <- d
+          mtx[cbind(col_idx, row_idx)] <- d
+          p <- suppressMessages(brainconn(atlas ="aal90", conmat=mtx, view = "ortho", edge.color.weighted = T))
+          f <- paste0(tempdir(), '/OUTPUT/PREDICTION/PNGFILES/CONNECTIVITY/', i, '.brain.connectivity.png')
+          suppressMessages(ggsave(f, plot = p, device = "png"))
+        }
 
-        rmarkdown::render(input = "/srv/shiny-server/predResults.Rmd")
+        rmarkdown::render(input = file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'predResults.Rmd'))
 
         removeModal()
 
@@ -310,9 +333,9 @@ predictServer <- function(id){
           mtx <- matrix(0, nrow = 90, ncol = 90)
           row_idx <- as.numeric(sub("\\_.*", "", colnames(x)[2:length(colnames(x))]))
           col_idx <- as.numeric(sub("^[^_]*_", "", colnames(x)[2:length(colnames(x))]))
-          patient <- as.numeric(sub("\\..*", "", input$plotname))
+          patient <- which(x$sampleid == sub("\\..*", "", input$plotname))
           d <- unlist(unname(x[patient, 2:length(colnames(x))]))
-          mtx[cbind(row_idx, col_idx)] <- d
+          
           mtx[cbind(col_idx, row_idx)] <- d
           mtx
       })
@@ -336,7 +359,6 @@ predictServer <- function(id){
         } else {
           auc <- " "
         }
-        # annotations <- read.csv(inputAnnotations()$datapath, check.names = FALSE)
         model_data <- data.frame(property = c("SVM-Type:", "SVM-Kernel:", "Cost:", "Gamma:", "Number of Support Vectors:", "AUC:"), 
                                  value = c(svm_m$model.type, kernels[svm_m$kernel+1], svm_m$cost, svm_m$gamma, svm_m$tot.nSV, auc), row.names = NULL)
       })
@@ -348,7 +370,8 @@ predictServer <- function(id){
       
       subject_data <- reactive({
         req(input$predict)
-        patient <- as.numeric(sub("\\..*", "", input$plotname))
+        x <- read.csv(file.path(tempdir(),'OUTPUT','PREDICTION', 'data_subset.csv'), check.names = FALSE)
+        patient <- which(x$sampleid == sub("\\..*", "", input$plotname))
         annotations <- read.csv(inputAnnotations()$datapath, check.names = FALSE)
         ann <- unname(as.matrix(annotations))[patient, ]
         subject_data <- data.frame(cnames = colnames(annotations),
@@ -375,8 +398,8 @@ predictServer <- function(id){
           # show_modal_spinner(text = "Generating Report...")
           # rmarkdown::render(input = tempReport)
           # removeModal()
-          # file.copy(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'predResults.pdf'), file)
-          file.copy("/srv/shiny-server/predResults.pdf", file)
+          file.copy(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'predResults.pdf'), file)
+          # file.copy("/srv/shiny-server/predResults.pdf", file)
         })
     }
   )
