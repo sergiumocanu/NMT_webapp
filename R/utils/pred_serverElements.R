@@ -291,7 +291,7 @@ predictServer <- function(id){
           f <- paste0(tempdir(), '/OUTPUT/PREDICTION/PNGFILES/CONNECTIVITY/', i, '.brain.connectivity.png')
           suppressMessages(ggsave(f, plot = p, device = "png"))
         }
-
+        
         rmarkdown::render(input = file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'predResults.Rmd'))
 
         removeModal()
@@ -329,13 +329,13 @@ predictServer <- function(id){
       
       pred_data <- reactive({
           req(input$predict)
+          req(input$plotname)
           x <- read.csv(file.path(tempdir(),'OUTPUT','PREDICTION', 'data_subset.csv'), check.names = FALSE)
           mtx <- matrix(0, nrow = 90, ncol = 90)
           row_idx <- as.numeric(sub("\\_.*", "", colnames(x)[2:length(colnames(x))]))
           col_idx <- as.numeric(sub("^[^_]*_", "", colnames(x)[2:length(colnames(x))]))
           patient <- which(x$sampleid == sub("\\..*", "", input$plotname))
           d <- unlist(unname(x[patient, 2:length(colnames(x))]))
-          
           mtx[cbind(col_idx, row_idx)] <- d
           mtx
       })
@@ -354,7 +354,7 @@ predictServer <- function(id){
         svm_m <- get('svm_m', model_env)
         kernels <- c("linear", "polynomial", "radial", "sigmoid")
         if('svm_m_test_svm_roc_auc' %in% ls(model_env)){
-          a <- auc <- get('svm_m_test_svm_roc_auc', model_env)
+          a <- get('svm_m_test_svm_roc_auc', model_env)
           auc <- a$svm.roc_object$control$auc[1]
         } else {
           auc <- " "

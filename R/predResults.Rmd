@@ -33,6 +33,7 @@ kernels <- c("linear", "polynomial", "radial", "sigmoid")
 
 if(exists("svm_m_test_svm_roc_auc")){
   auc <- svm_m_test_svm_roc_auc$svm.roc_object$control$auc[1]
+} else {
   auc <- " "
 }
 
@@ -41,8 +42,9 @@ model_data <- data.frame(property = c("SVM-Type:", "SVM-Kernel:", "Cost:", "Gamm
 
 annotations <- read.csv(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'annot.csv'), check.names = FALSE)
 
+x <- read.csv(normalizePath(file.path(tempdir(),'OUTPUT','PREDICTION','data_subset.csv')), check.names = FALSE)
+
 for (i in seq_len(dim(x)[1])){     #seq_len(dim(x)[1])
-  # subject <- sub("\\..*", "", basename(piechart_imgs[i]))
   subject <- which(x$sampleid == sub("\\..*", "", basename(piechart_imgs[i])))
   c <- as.numeric(subject)
   cat("\n## Subject", subject, "\n")

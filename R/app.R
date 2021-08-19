@@ -88,6 +88,7 @@ ui <- dashboardPage(
         menuItem(text = "Regression Analysis", tabName = "regression"),
         menuItem(text = "CV-Only Classification Analysis", tabName = "cv"),
         menuItem(text = "CV-Only Regression Analysis", tabName = "cv_regression"),
+        menuItem(text = "Prediction", tabName = "prediction"),
         menuItem(text = "References", tabName = "references")
     )),
     
@@ -133,7 +134,7 @@ ui <- dashboardPage(
                     "allfiles"
                 )
             ),
-            fluidRow(predictUI("regular")),
+            # fluidRow(predictUI("regular")),
             plotlyOutput("brainConnectivity")
             
         ),
@@ -301,6 +302,12 @@ ui <- dashboardPage(
 
 
         ),
+        
+        tabItem(
+            tabName = "prediction",
+            fluidRow(predictUI("regular"))
+        ),
+        
         tabItem(
             tabName = "references",
             h1("If you use our application please cite the following papers: "),
