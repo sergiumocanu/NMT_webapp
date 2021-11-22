@@ -143,13 +143,34 @@ predictServer <- function(id){
           searching = FALSE,
           paging = FALSE,
           bsort = FALSE,
-          bInfo = FALSE,
-          selection = 'single'
-        )
+          bInfo = FALSE
+        ),
+        selection = 'single'
       ))
       
+      # chosenSampleVar <- reactiveVals()
+      
       chosenSampleVar <- reactive({
-        columnVars()[input$varnames_row_last_clicked]
+        # browser()
+        out <- columnVars()[input$varnames_row_last_clicked]
+        # if (length(unlist(unique(annotations_data()[out]))) != dim(annotations_data())[1]) {
+        #   chosen <- length(unlist(unique(annotations_data()[columnVars()[input$varnames_row_last_clicked]])))
+        #   actual <- dim(annotations_data())[1]
+        #   shinyalert(title = "Possible incorrect chosen sample variable",
+        #              type = "error",
+        #              text = paste0("The chosen annotation column has ",
+        #                            chosen,
+        #                            " unique samples, however there were ",
+        #                            actual,
+        #                            " number of rows in the annotation file"))
+        #   stop(paste0("The chosen annotation column has ",
+        #               chosen,
+        #               " unique samples, however there were ",
+        #               actual,
+        #               " number of rows in the annotation file"))
+        # } else {
+        #   return(out)
+        # }
       })
       
       inputArgs <- reactive({
@@ -179,10 +200,38 @@ predictServer <- function(id){
       })
 
       observeEvent(input$varnames_row_last_clicked, {
-        # cat(" WE JUST SELECTED THE ROW")
-        # file.copy("predResults.Rmd", file.path(tempdir(), 'OUTPUT','PREDICTION','predResults.Rmd'))
-        pred_dat_process(inputArgs())
-        enable("predict")
+
+        if (length(unlist(unique(annotations_data()[columnVars()[input$varnames_row_last_clicked]]))) != dim(annotations_data())[1]) {
+          chosen <-
+            length(unlist(unique(annotations_data()[columnVars()[input$varnames_row_last_clicked]])))
+          actual <- dim(annotations_data())[1]
+          showModal(
+            modalDialog(
+              title = "Possible incorrect chosen sample variable",
+              paste0(
+                "The chosen annotation column has ",
+                chosen,
+                " unique samples, however there were ",
+                actual,
+                " number of rows in the annotation file"
+              ),
+              easyClose = TRUE
+            )
+          )
+        } else if (dim(predict_data()[[1]])[3] != dim(annotations_data())[1]) {
+          showModal(
+            modalDialog(
+              title = "Possible Incorrect Data", 
+              paste0("There are ", dim(predict_data()[[1]])[3], " samples but ", dim(annotations_data())[1], " annotations! Please check the input files."),
+              easyClose = TRUE
+            )
+          )
+        } else {
+          pred_dat_process(inputArgs())
+          enable("predict")
+        }
+        
+        
       })
       
       
