@@ -7,13 +7,6 @@ uploadFilesServer <- function(id){
         input$data
       })
       
-      # data <- reactive({
-      #   dater = matrix(list(), nrow = 1, ncol = 1)
-      #   df <- readMat(dataFile()$datapath)
-      #   df <- df[[1]]
-      #   dater[[1, 1]] <- df
-      # })
-      # 
       annotationsFile <- reactive({
         validate(need(input$annotations, message = FALSE))
         input$annotations
@@ -42,15 +35,10 @@ uploadFilesServer <- function(id){
       annotations <- reactive({
         xt <- tools::file_ext(dataFile()$datapath)
         if (xt == "mat"){
-          print("annotations is 3D!")
-          # dater = matrix(list(),
-          #                nrow = 1,
-          #                ncol = 1)
           df <- read.csv(annotationsFile()$datapath,
                          header = TRUE,
                          sep = ",",
                          check.names = FALSE)
-          # dater[[1, 1]] <- df
         } else if (xt == "csv") {
           dater <- data.frame(data()[2]) # will have to change this later!!!
         }
@@ -70,23 +58,6 @@ uploadFilesServer <- function(id){
 
         }
       })
-
-      # output <- reactive({
-      #   # print(dim(data()))
-      #   xt <- tools::file_ext(dataFile()$datapath)
-      #   if (xt == "mat"){
-      #     print("FILE IS 3D")
-      #     print(dim(annotations()))
-      #     list(data = data, 
-      #          annotations = annotations, 
-      #          node = node)
-      #   } else if (xt == "csv"){
-      #     list(data = data, 
-      #          annotations = annotations)
-      #   }
-      # })
-      # 
-      # return(output)
       
       return(list(data = data,
                   annotations = annotations,
@@ -148,29 +119,8 @@ predictServer <- function(id){
         selection = 'single'
       ))
       
-      # chosenSampleVar <- reactiveVals()
-      
       chosenSampleVar <- reactive({
-        # browser()
         out <- columnVars()[input$varnames_row_last_clicked]
-        # if (length(unlist(unique(annotations_data()[out]))) != dim(annotations_data())[1]) {
-        #   chosen <- length(unlist(unique(annotations_data()[columnVars()[input$varnames_row_last_clicked]])))
-        #   actual <- dim(annotations_data())[1]
-        #   shinyalert(title = "Possible incorrect chosen sample variable",
-        #              type = "error",
-        #              text = paste0("The chosen annotation column has ",
-        #                            chosen,
-        #                            " unique samples, however there were ",
-        #                            actual,
-        #                            " number of rows in the annotation file"))
-        #   stop(paste0("The chosen annotation column has ",
-        #               chosen,
-        #               " unique samples, however there were ",
-        #               actual,
-        #               " number of rows in the annotation file"))
-        # } else {
-        #   return(out)
-        # }
       })
       
       inputArgs <- reactive({
@@ -180,10 +130,6 @@ predictServer <- function(id){
         annot_file <- inputAnnotations()$datapath
         sampleid_var <- chosenSampleVar()
         unlink(file.path(tempdir(), 'OUTPUT', 'PREDICTION'), recursive = TRUE)
-        # do.call(file.remove, list(list.files(
-        #   file.path(tempdir(), 'OUTPUT', 'PREDICTION'),
-        #   full.names = TRUE, recursive = TRUE
-        # )))
         dir.create(
           file.path(tempdir(), 'OUTPUT', 'PREDICTION'),
           showWarnings = FALSE,
@@ -277,11 +223,6 @@ predictServer <- function(id){
         
         
         pred_classif(predInputArgs())
-        # unlink(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'PNGFILES'))
-        # do.call(file.remove, list(list.files(
-        #     file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'PNGFILES'),
-        #     full.names = TRUE, recursive = TRUE
-        # )))
         dir.create(
           file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'PNGFILES', 'CONNECTIVITY'),
           showWarnings = FALSE,
@@ -322,8 +263,7 @@ predictServer <- function(id){
         updateSelectInput(session = session,
                           inputId = "plotname",
                           choices = files)
-        # setwd("/srv/shiny-server")
-        
+
         # render the connectivity png files
         library(brainconn)
         
@@ -419,6 +359,7 @@ predictServer <- function(id){
       
       subject_data <- reactive({
         req(input$predict)
+        req(input$plotname)
         x <- read.csv(file.path(tempdir(),'OUTPUT','PREDICTION', 'data_subset.csv'), check.names = FALSE)
         patient <- which(x$sampleid == sub("\\..*", "", input$plotname))
         annotations <- read.csv(inputAnnotations()$datapath, check.names = FALSE)
@@ -441,14 +382,8 @@ predictServer <- function(id){
         },
         content = function(file) {
           
-          # tempReport <- paste0(tempdir(), '\\OUTPUT\\PREDICTION\\predResults.Rmd')
-          # setwd("/srv/shiny-server/")
-          # tempReport <- "predResults.Rmd"
-          # show_modal_spinner(text = "Generating Report...")
-          # rmarkdown::render(input = tempReport)
-          # removeModal()
           file.copy(file.path(tempdir(), 'OUTPUT', 'PREDICTION', 'predResults.pdf'), file)
-          # file.copy("/srv/shiny-server/predResults.pdf", file)
+          
         })
     }
   )
